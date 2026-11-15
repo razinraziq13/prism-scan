@@ -41,6 +41,12 @@
     <button id="install-close" aria-label="Close">✕</button>
   </div>
 
+  <div id="android-install" class="install-banner android hidden">
+    <span>📲 Install Prism Scan as an app</span>
+    <button id="android-install-btn" class="install-btn">Install</button>
+    <button id="android-install-close" aria-label="Close">✕</button>
+  </div>
+
   <div class="search-wrap">
     <input id="search" type="search" placeholder="🔍  Search documents" autocomplete="off">
   </div>
@@ -132,10 +138,52 @@
   <footer class="doc-actions">
     <button class="act" id="page-left"><span class="act-ic a1">◀</span>Move</button>
     <button class="act" id="page-right"><span class="act-ic a2">▶</span>Move</button>
+    <button class="act" id="page-sign"><span class="act-ic a6">✍️</span>Sign</button>
     <button class="act" id="page-ocr"><span class="act-ic a4">🔤</span>Text</button>
     <button class="act" id="page-share"><span class="act-ic a3">📤</span>Share</button>
     <button class="act" id="page-delete"><span class="act-ic a5">🗑️</span>Delete</button>
   </footer>
+</div>
+
+<div id="sheet-sign" class="sheet full hidden">
+  <header class="bar">
+    <button class="icon-btn" data-close aria-label="Close">✕</button>
+    <h2>Sign page</h2>
+    <button class="icon-btn" id="sign-revert" aria-label="Remove all signatures" title="Remove all signatures">↺</button>
+  </header>
+  <div class="sign-stage" id="sign-stage">
+    <img id="sign-page" alt="Page to sign">
+    <div id="sign-box" class="sign-box hidden">
+      <img id="sign-img" alt="Signature" draggable="false">
+      <span class="sign-resize" id="sign-resize" aria-label="Resize"></span>
+    </div>
+    <div id="sign-hint" class="sign-hint">Pick a signature below, then drag it into place</div>
+  </div>
+  <div class="sig-list" id="sig-list"></div>
+  <footer class="tools">
+    <button class="tool" id="sign-new"><span class="tool-ic g1">✍️</span>New</button>
+    <button class="primary" id="sign-apply" disabled>✓ Apply signature</button>
+  </footer>
+</div>
+
+<div id="sheet-pad" class="sheet hidden">
+  <div class="grab"></div>
+  <h3>✍️ Draw your signature</h3>
+  <div class="pad-wrap">
+    <canvas id="pad"></canvas>
+    <div class="pad-line"></div>
+    <span class="pad-ph" id="pad-ph">Sign here with your finger</span>
+  </div>
+  <div class="row">
+    <div class="inks" id="inks">
+      <button class="ink on" data-ink="#111827" style="--ink:#111827" aria-label="Black ink"></button>
+      <button class="ink" data-ink="#1d4ed8" style="--ink:#1d4ed8" aria-label="Blue ink"></button>
+      <button class="ink" data-ink="#7c3aed" style="--ink:#7c3aed" aria-label="Purple ink"></button>
+      <button class="ink" data-ink="#dc2626" style="--ink:#dc2626" aria-label="Red ink"></button>
+    </div>
+    <button class="ghost" id="pad-clear">Clear</button>
+  </div>
+  <div class="col"><button class="primary" id="pad-save">Save signature</button></div>
 </div>
 
 <div id="sheet-ocr" class="sheet hidden">
@@ -183,7 +231,9 @@
   <div class="grab"></div>
   <h3>💡 Tips</h3>
   <ul class="tips">
-    <li><b>Install:</b> in Safari tap <b>Share</b> then <b>Add to Home Screen</b>.</li>
+    <li><b>Install on iPhone:</b> in Safari tap <b>•••</b> or <b>Share</b>, then <b>Add to Home Screen</b>.</li>
+    <li><b>Install on Android:</b> in Chrome tap <b>⋮</b>, then <b>Install app</b> (or <b>Add to Home screen</b>).</li>
+    <li><b>Sign:</b> open a page and tap <b>✍️ Sign</b>. Your saved signatures stay on this phone.</li>
     <li><b>Best scans:</b> put the paper on a dark, plain surface with good light.</li>
     <li><b>Corners:</b> drag the colored dots. A zoom bubble helps you place them exactly.</li>
     <li><b>Magic</b> filter whitens paper and sharpens text. <b>B&amp;W</b> is best for printing.</li>
@@ -191,6 +241,7 @@
     <li><b>Private:</b> scans stay on this phone. Export important PDFs to Files as a backup.</li>
   </ul>
   <div class="col">
+    <button class="primary hidden" id="tips-install">📲 Install app</button>
     <a class="ghost video-link" href="tutorial.html">▶️ Watch the install video</a>
     <button class="primary" data-close>Got it</button>
   </div>

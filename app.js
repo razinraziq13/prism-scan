@@ -93,12 +93,12 @@
     _p: null,
     open() {
       if (!this._p) this._p = new Promise((res, rej) => {
-        const r = indexedDB.open('prism-scan', 1);
+        const r = indexedDB.open('prism-scan', 2);
         r.onupgradeneeded = () => {
           const d = r.result;
-          d.createObjectStore('docs', { keyPath: 'id' });
-          d.createObjectStore('pages', { keyPath: 'id' });
-          d.createObjectStore('thumbs', { keyPath: 'id' });
+          for (const s of ['docs', 'pages', 'thumbs', 'sigs']) {
+            if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' });
+          }
         };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
@@ -357,6 +357,7 @@
     el.classList.add('hidden'); sheetStack.splice(sheetStack.indexOf(el), 1); restack();
     if (el.id === 'sheet-page' && state.pageUrl) { URL.revokeObjectURL(state.pageUrl); state.pageUrl = null; $('#page-img').removeAttribute('src'); }
     if (el.id === 'sheet-export' && state.exportUrl) { URL.revokeObjectURL(state.exportUrl); state.exportUrl = null; }
+    if (el.id === 'sheet-sign') { sign.urls.forEach(u => URL.revokeObjectURL(u)); sign.urls = []; }
   }
   function restack() {
     const bd = $('#sheet-backdrop');
@@ -519,7 +520,7 @@
     const [cx, cy] = state.corners[best];
     drag = { i: best, offX: v.ox + cx * v.s - px, offY: v.oy + cy * v.s - py };
     state.cornersTouched = true; state.cropToken++; setStatus('');
-    stage.setPointerCapture(e.pointerId);
+    try { stage.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
     $('#loupe').classList.remove('hidden'); drawLoupe(best);
     e.preventDefault();
   });
@@ -776,6 +777,247 @@
     toast('🗑️ Page deleted'); openDoc(doc.id);
   };
 
+  /* ---------------- signatures ---------------- */
+  const sign = { pageId: null, page: null, sigId: null, sigData: null, box: null, view: null, urls: [] };
+  function forgetThumb(id) { const u = thumbUrls.get(id); if (u) { URL.revokeObjectURL(u); thumbUrls.delete(id); } }
+
+  async function openSign() {
+    const doc = await DB.get('docs', state.docId); if (!doc) return;
+    const pid = doc.pages[state.pageIdx]; const page = await DB.get('pages', pid); if (!page) return;
+    Object.assign(sign, { pageId: pid, page, box: null });
+    $('#sign-revert').style.visibility = page.orig ? 'visible' : 'hidden';
+    $('#sign-page').src = state.pageUrl;
+    $('#sign-box').classList.add('hidden'); $('#sign-hint').classList.remove('hidden');
+    $('#sign-apply').disabled = true;
+    openSheet('sheet-sign');
+    layoutSign(); // reading clientWidth forces layout, so no frame wait is needed
+    const sigs = await renderSigList();
+    if (!sigs.length) openPad();
+    else if (sign.sigId) { const s = sigs.find(x => x.id === sign.sigId); if (s) useSig(s, sign.urls[sigs.indexOf(s)]); }
+  }
+  function layoutSign() {
+    const st = $('#sign-stage'), W = st.clientWidth, H = st.clientHeight, pad = 18, p = sign.page;
+    if (!p || !W) return;
+    const s = Math.min((W - pad * 2) / p.w, (H - pad * 2) / p.h), dw = p.w * s, dh = p.h * s;
+    sign.view = { ox: (W - dw) / 2, oy: (H - dh) / 2, dw, dh };
+    Object.assign($('#sign-page').style, { left: sign.view.ox + 'px', top: sign.view.oy + 'px', width: dw + 'px', height: dh + 'px' });
+    placeBox();
+  }
+  function fitBox(b) {
+    const v = sign.view;
+    const maxW = Math.min(1, v.dh / (v.dw * b.ratio));
+    b.w = clamp(b.w, 0.08, maxW);
+    const hFrac = b.w * v.dw * b.ratio / v.dh;
+    b.x = clamp(b.x, 0, 1 - b.w); b.y = clamp(b.y, 0, 1 - hFrac);
+    return b;
+  }
+  function placeBox() {
+    const b = sign.box, v = sign.view; if (!b || !v) return;
+    const w = b.w * v.dw;
+    Object.assign($('#sign-box').style, { left: v.ox + b.x * v.dw + 'px', top: v.oy + b.y * v.dh + 'px', width: w + 'px', height: w * b.ratio + 'px' });
+  }
+  async function renderSigList() {
+    sign.urls.forEach(u => URL.revokeObjectURL(u)); sign.urls = [];
+    const sigs = (await DB.all('sigs')).sort((a, b) => b.created - a.created);
+    const list = $('#sig-list'); list.textContent = '';
+    const add = document.createElement('button');
+    add.className = 'sig-tile add'; add.textContent = '＋ New'; add.onclick = openPad;
+    list.appendChild(add);
+    for (const s of sigs) {
+      const url = URL.createObjectURL(new Blob([s.data], { type: 'image/png' })); sign.urls.push(url);
+      const t = document.createElement('button');
+      t.className = 'sig-tile' + (s.id === sign.sigId ? ' on' : ''); t.dataset.id = s.id;
+      const img = document.createElement('img'); img.src = url; img.alt = 'Saved signature'; t.appendChild(img);
+      const del = document.createElement('span');
+      del.className = 'sig-del'; del.textContent = '✕'; del.setAttribute('role', 'button'); del.setAttribute('aria-label', 'Delete signature');
+      del.onclick = async e => {
+        e.stopPropagation();
+        if (!confirm('Delete this saved signature?')) return;
+        await DB.del('sigs', s.id);
+        if (sign.sigId === s.id) { sign.sigId = null; sign.box = null; $('#sign-box').classList.add('hidden'); $('#sign-apply').disabled = true; $('#sign-hint').classList.remove('hidden'); }
+        renderSigList();
+      };
+      t.appendChild(del);
+      t.onclick = () => useSig(s, url);
+      list.appendChild(t);
+    }
+    return sigs;
+  }
+  function useSig(s, url) {
+    sign.sigId = s.id; sign.sigData = s.data;
+    document.querySelectorAll('#sig-list .sig-tile').forEach(t => t.classList.toggle('on', t.dataset.id === s.id));
+    $('#sign-img').src = url;
+    const ratio = s.h / s.w;
+    if (sign.box) sign.box.ratio = ratio;
+    else {
+      const w = 0.38, hFrac = w * sign.view.dw * ratio / sign.view.dh;
+      sign.box = { x: 1 - w - 0.07, y: 0.86 - hFrac, w, ratio };
+    }
+    fitBox(sign.box);
+    $('#sign-box').classList.remove('hidden'); $('#sign-hint').classList.add('hidden');
+    $('#sign-apply').disabled = false;
+    placeBox();
+  }
+  (function signDrag() {
+    const el = $('#sign-box'); let d = null;
+    el.addEventListener('pointerdown', e => {
+      if (!sign.box) return;
+      d = { resize: e.target.id === 'sign-resize', sx: e.clientX, sy: e.clientY, b: { ...sign.box } };
+      try { el.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } e.preventDefault();
+    });
+    el.addEventListener('pointermove', e => {
+      if (!d) return;
+      const v = sign.view, dx = (e.clientX - d.sx) / v.dw, dy = (e.clientY - d.sy) / v.dh, b = sign.box;
+      if (d.resize) b.w = d.b.w + dx; else { b.x = d.b.x + dx; b.y = d.b.y + dy; }
+      fitBox(b); placeBox();
+    });
+    const end = () => { d = null; };
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  })();
+
+  async function savePageImage(page, doc, canvas, keepOriginal) {
+    const blob = await toBlob(canvas, 'image/jpeg', 0.9);
+    const thumb = await toBlob(downscale(canvas, 360), 'image/jpeg', 0.72);
+    if (keepOriginal && !page.orig) { page.orig = page.data; page.origSize = page.size; }
+    const old = page.size;
+    page.data = await blob.arrayBuffer(); page.size = blob.size;
+    await DB.put('pages', page);
+    await DB.put('thumbs', { id: page.id, data: await thumb.arrayBuffer() });
+    forgetThumb(page.id);
+    doc.size = Math.max(0, (doc.size || 0) - old + blob.size); doc.updated = Date.now();
+    await DB.put('docs', doc);
+  }
+  $('#sign-apply').onclick = async () => {
+    if (!sign.box || !sign.sigData) return;
+    const btn = $('#sign-apply'); btn.disabled = true;
+    try {
+      const page = await DB.get('pages', sign.pageId), doc = await DB.get('docs', state.docId);
+      const base = await loadImageFile(new Blob([page.data], { type: 'image/jpeg' }));
+      const sig = await loadImageFile(new Blob([sign.sigData], { type: 'image/png' }));
+      const W = base.width, H = base.height, b = sign.box, x = base.getContext('2d'), w = b.w * W;
+      x.globalCompositeOperation = 'multiply';
+      x.drawImage(sig, b.x * W, b.y * H, w, w * b.ratio);
+      x.globalCompositeOperation = 'source-over';
+      await savePageImage(page, doc, base, true);
+      closeSheet($('#sheet-sign'));
+      toast('✍️ Page signed');
+      await openDoc(doc.id); openPage(state.pageIdx);
+    } catch (err) { toast('⚠️ ' + err.message, 3500); }
+    finally { btn.disabled = false; }
+  };
+  $('#sign-revert').onclick = async () => {
+    const page = await DB.get('pages', sign.pageId); if (!page || !page.orig) return;
+    if (!confirm('Remove all signatures from this page and restore the original scan?')) return;
+    const doc = await DB.get('docs', state.docId);
+    // put the untouched original bytes back (no re-compression), and rebuild the thumbnail
+    const original = await loadImageFile(new Blob([page.orig], { type: 'image/jpeg' }));
+    const thumb = await toBlob(downscale(original, 360), 'image/jpeg', 0.72);
+    const old = page.size;
+    page.data = page.orig; page.size = page.origSize || page.orig.byteLength;
+    delete page.orig; delete page.origSize;
+    await DB.put('pages', page);
+    await DB.put('thumbs', { id: page.id, data: await thumb.arrayBuffer() });
+    forgetThumb(page.id);
+    doc.size = Math.max(0, (doc.size || 0) - old + page.size); doc.updated = Date.now();
+    await DB.put('docs', doc);
+    closeSheet($('#sheet-sign'));
+    toast('↺ Original page restored');
+    await openDoc(doc.id); openPage(state.pageIdx);
+  };
+  $('#page-sign').onclick = openSign;
+  $('#sign-new').onclick = () => openPad();
+  window.addEventListener('resize', () => { if (!$('#sheet-sign').classList.contains('hidden')) layoutSign(); });
+
+  /* signature drawing pad */
+  const pad = { ctx: null, ink: lsGet('ink') || '#111827', drawing: false, pts: [], w: 0, dirty: false, dpr: 1 };
+  function openPad() {
+    openSheet('sheet-pad');
+    document.querySelectorAll('#inks .ink').forEach(b => b.classList.toggle('on', b.dataset.ink === pad.ink));
+    const c = $('#pad'), r = c.getBoundingClientRect();
+    pad.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    c.width = Math.round(r.width * pad.dpr); c.height = Math.round(r.height * pad.dpr);
+    pad.ctx = c.getContext('2d', { willReadFrequently: true });
+    clearPad();
+  }
+  function clearPad() {
+    const c = $('#pad'); pad.ctx.clearRect(0, 0, c.width, c.height);
+    pad.dirty = false; $('#pad-ph').classList.remove('hidden');
+  }
+  (function padEvents() {
+    const c = $('#pad');
+    const pt = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) * pad.dpr, y: (e.clientY - r.top) * pad.dpr, t: e.timeStamp }; };
+    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    function stroke(from, ctrl, to, w) {
+      const x = pad.ctx;
+      x.strokeStyle = pad.ink; x.lineWidth = w; x.lineCap = 'round'; x.lineJoin = 'round';
+      x.beginPath(); x.moveTo(from.x, from.y);
+      if (ctrl) x.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y); else x.lineTo(to.x, to.y);
+      x.stroke();
+    }
+    function addPoint(p) {
+      const pts = pad.pts, prev = pts[pts.length - 1];
+      const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
+      if (dist < 1.2 * pad.dpr) return;
+      const v = dist / pad.dpr / Math.max(1, p.t - prev.t);           // CSS px per ms
+      const target = clamp(4.2 - v * 1.3, 1.5, 4.2) * pad.dpr;        // faster stroke = thinner line
+      pad.w = pad.w * 0.65 + target * 0.35;
+      pts.push(p);
+      if (pts.length === 2) stroke(prev, null, mid(prev, p), pad.w);
+      else stroke(mid(pts[pts.length - 3], prev), prev, mid(prev, p), pad.w);
+    }
+    c.addEventListener('pointerdown', e => {
+      if (!pad.ctx) return;
+      try { c.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+      const p = pt(e);
+      pad.drawing = true; pad.pts = [p]; pad.w = 3.2 * pad.dpr; pad.dirty = true;
+      pad.ctx.fillStyle = pad.ink; pad.ctx.beginPath(); pad.ctx.arc(p.x, p.y, pad.w / 2, 0, Math.PI * 2); pad.ctx.fill();
+      $('#pad-ph').classList.add('hidden');
+      e.preventDefault();
+    });
+    c.addEventListener('pointermove', e => {
+      if (!pad.drawing) return;
+      const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      (evs.length ? evs : [e]).forEach(ev => addPoint(pt(ev)));
+      e.preventDefault();
+    });
+    const end = e => {
+      if (!pad.drawing) return;
+      pad.drawing = false;
+      const pts = pad.pts;
+      if (pts.length > 1) { const a = pts[pts.length - 2], b = pts[pts.length - 1]; stroke(mid(a, b), null, b, pad.w); }
+    };
+    c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  })();
+  document.querySelectorAll('#inks .ink').forEach(b => b.addEventListener('click', () => {
+    pad.ink = b.dataset.ink; lsSet('ink', pad.ink);
+    document.querySelectorAll('#inks .ink').forEach(x => x.classList.toggle('on', x === b));
+    if (pad.dirty) { // recolour what is already drawn
+      const c = $('#pad'), x = pad.ctx;
+      x.globalCompositeOperation = 'source-in'; x.fillStyle = pad.ink; x.fillRect(0, 0, c.width, c.height);
+      x.globalCompositeOperation = 'source-over';
+    }
+  }));
+  $('#pad-clear').onclick = clearPad;
+  $('#pad-save').onclick = async () => {
+    if (!pad.dirty) { toast('✍️ Draw your signature first'); return; }
+    const c = $('#pad'), w = c.width, h = c.height, data = pad.ctx.getImageData(0, 0, w, h).data;
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 10) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    }
+    if (maxX < 0) { toast('✍️ Draw your signature first'); return; }
+    const m = Math.round(6 * pad.dpr);
+    minX = Math.max(0, minX - m); minY = Math.max(0, minY - m); maxX = Math.min(w - 1, maxX + m); maxY = Math.min(h - 1, maxY + m);
+    const cw = maxX - minX + 1, ch = maxY - minY + 1, out = makeCanvas(cw, ch);
+    out.getContext('2d').drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+    const blob = await toBlob(out, 'image/png');
+    const rec = { id: uid(), data: await blob.arrayBuffer(), w: cw, h: ch, created: Date.now() };
+    await DB.put('sigs', rec);
+    closeSheet($('#sheet-pad'));
+    toast('✅ Signature saved');
+    if (!$('#sheet-sign').classList.contains('hidden')) { await renderSigList(); useSig(rec, sign.urls[0]); }
+  };
+
   /* ---------------- OCR ---------------- */
   function openOcr(ids) {
     state.ocrIds = ids.slice(); state.ocrText = '';
@@ -840,6 +1082,31 @@
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   if (isIOS && !standalone && !lsGet('hideInstall')) $('#install-banner').classList.remove('hidden');
   $('#install-close').onclick = () => { $('#install-banner').classList.add('hidden'); lsSet('hideInstall', '1'); };
+
+  // Android / Chrome: one-tap install using the browser's own install prompt
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installPrompt = e;
+    $('#tips-install').classList.remove('hidden');
+    if (!lsGet('hideAndroidInstall')) $('#android-install').classList.remove('hidden');
+  });
+  async function doInstall() {
+    if (!installPrompt) { openSheet('sheet-help'); return; }
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
+    installPrompt = null;
+    $('#android-install').classList.add('hidden'); $('#tips-install').classList.add('hidden');
+    if (outcome === 'accepted') toast('🎉 Installing Prism Scan…');
+  }
+  $('#android-install-btn').onclick = doInstall;
+  $('#tips-install').onclick = () => { closeSheet($('#sheet-help')); doInstall(); };
+  $('#android-install-close').onclick = () => { $('#android-install').classList.add('hidden'); lsSet('hideAndroidInstall', '1'); };
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    $('#android-install').classList.add('hidden'); $('#tips-install').classList.add('hidden');
+    toast('🎉 Prism Scan installed');
+  });
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

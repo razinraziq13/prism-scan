@@ -332,6 +332,64 @@ textarea {
 .page-view { flex: 1; display: grid; place-items: center; padding: 10px; overflow: hidden; }
 .page-view img { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35); background: #fff; }
 
+/* ---------- android install ---------- */
+.install-banner.android { background: linear-gradient(90deg, #dcfce7, #cffafe); color: #134e4a; }
+.install-banner.android button { color: #134e4a; }
+.install-banner .install-btn {
+  background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #fff !important;
+  font-weight: 800; font-size: 13px; padding: 7px 14px !important; border-radius: 999px;
+}
+.a6 { background: linear-gradient(135deg, #6366f1, #a855f7); }
+
+/* ---------- signatures ---------- */
+.sign-stage {
+  position: relative; flex: 1; margin: 0 10px; border-radius: 22px; overflow: hidden;
+  background: radial-gradient(circle at 30% 20%, #2e1065 0%, var(--stage) 60%);
+  touch-action: none;
+}
+#sign-page { position: absolute; background: #fff; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.sign-box {
+  position: absolute; border: 2px dashed #f472b6; border-radius: 8px; background: rgba(244,114,182,.08);
+  touch-action: none; cursor: move;
+}
+.sign-box img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+.sign-resize {
+  position: absolute; right: -14px; bottom: -14px; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--grad); border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); cursor: nwse-resize;
+}
+.sign-resize::after { content: "⤡"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 900; }
+.sign-hint {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  background: rgba(0,0,0,.65); color: #fff; font-size: 13px; font-weight: 600;
+  padding: 8px 14px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+}
+.sig-list { display: flex; gap: 10px; overflow-x: auto; padding: 14px 14px 2px; flex-shrink: 0; scrollbar-width: none; }
+.sig-list::-webkit-scrollbar { display: none; }
+.sig-tile {
+  position: relative; flex-shrink: 0; width: 120px; height: 64px; border-radius: 14px;
+  background: #fff; border: 3px solid var(--line); display: grid; place-items: center; padding: 6px;
+}
+.sig-tile img { max-width: 100%; max-height: 100%; pointer-events: none; }
+.sig-tile.on { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(236,72,153,.25); }
+.sig-tile.add { background: var(--bg); border-style: dashed; color: var(--muted); font-weight: 800; font-size: 13px; }
+.sig-del {
+  position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%;
+  background: #ef4444; color: #fff; font-size: 12px; font-weight: 900; display: grid; place-items: center;
+  border: 2px solid var(--card);
+}
+.pad-wrap {
+  position: relative; height: 210px; border-radius: 18px; background: #fff; overflow: hidden;
+  border: 3px solid transparent; background-clip: padding-box;
+  box-shadow: 0 0 0 3px #f9a8d4 inset, 0 8px 24px -12px rgba(124,58,237,.6);
+  touch-action: none;
+}
+#pad { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.pad-line { position: absolute; left: 24px; right: 24px; bottom: 52px; height: 2px; background: repeating-linear-gradient(90deg, #d8b4fe 0 10px, transparent 10px 16px); pointer-events: none; }
+.pad-ph { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-80%); text-align: center; color: #c4b5fd; font-weight: 700; pointer-events: none; }
+.inks { display: flex; gap: 10px; flex: 1; }
+.ink { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); border: 3px solid var(--card); box-shadow: 0 0 0 2px var(--line); }
+.ink.on { box-shadow: 0 0 0 3px var(--pink); }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; left: 50%; top: calc(var(--safe-top) + 14px); z-index: 50;

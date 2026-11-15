@@ -18,10 +18,16 @@
     padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px);
   }
   h1 { margin: 6px 0 4px; font-size: 22px; text-align: center; }
-  p.sub { margin: 0 0 14px; color: var(--muted); font-size: 14px; text-align: center; }
+  p.sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; text-align: center; }
+  .os { display: flex; gap: 6px; padding: 5px; border-radius: 999px; background: rgba(255,255,255,.1); margin-bottom: 14px; }
+  .os button {
+    border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-weight: 700; font-size: 14px;
+    color: var(--muted); background: transparent; cursor: pointer;
+  }
+  .os button.on { background: var(--grad); color: #fff; }
   .player { width: 100%; max-width: 420px; }
   canvas {
-    display: block; width: 100%; height: auto; aspect-ratio: 9 / 16; max-height: 72vh; object-fit: contain;
+    display: block; width: 100%; height: auto; aspect-ratio: 9 / 16; max-height: 70vh; object-fit: contain;
     border-radius: 22px; box-shadow: 0 20px 60px -15px rgba(236,72,153,.55); background: #000; cursor: pointer;
   }
   .controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
@@ -30,19 +36,21 @@
     background: var(--grad); flex-shrink: 0;
   }
   .controls button.alt { background: rgba(255,255,255,.12); }
-  input[type=range] { flex: 1; accent-color: #ec4899; }
+  input[type=range] { flex: 1; min-width: 0; accent-color: #ec4899; }
   .time { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); width: 74px; text-align: right; }
   .links { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; width: 100%; max-width: 420px; }
-  .links a {
-    display: block; text-align: center; padding: 14px; border-radius: 16px; font-weight: 700; text-decoration: none; color: #fff;
-  }
+  .links a { display: block; text-align: center; padding: 14px; border-radius: 16px; font-weight: 700; text-decoration: none; color: #fff; }
   .links a.primary { background: var(--grad); }
   .links a.ghost { background: rgba(255,255,255,.1); }
 </style>
 </head>
 <body>
   <h1>How to install Prism Scan</h1>
-  <p class="sub">A 45-second guide for iPhone</p>
+  <p class="sub" id="subline">A short guide</p>
+  <div class="os" role="tablist">
+    <button id="os-ios" role="tab"> iPhone</button>
+    <button id="os-android" role="tab">🤖 Android</button>
+  </div>
   <div class="player">
     <canvas id="v" width="1080" height="1920" aria-label="Animated install tutorial"></canvas>
     <div class="controls">
@@ -53,7 +61,7 @@
     </div>
   </div>
   <div class="links">
-    <a class="primary" href="tutorial.mp4" download="Prism-Scan-install-tutorial.mp4">⬇ Download video (MP4)</a>
+    <a class="primary" id="dl" href="tutorial.mp4" download>⬇ Download video (MP4)</a>
     <a class="ghost" href="./">Open Prism Scan →</a>
   </div>
 
@@ -65,8 +73,11 @@ const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", R
 const EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 const LINK = 'razinraziq13.github.io/prism-scan';
 const icon = new Image(); icon.src = 'icons/icon-512.png';
+const iconRound = new Image(); iconRound.src = 'icons/icon-maskable-512.png';
+let OS = new URLSearchParams(location.search).get('os') || (/android/i.test(navigator.userAgent) ? 'android' : 'ios');
+if (OS !== 'android') OS = 'ios';
 
-/* phone geometry: screen content is drawn in iPhone points (393 x 866) */
+/* phone geometry: screen content is drawn in phone points (393 x 866) */
 const PX = 250, PY = 560, PW = 580, PH = 1240, BZ = 16;
 const SX = PX + BZ, SY = PY + BZ, SW = PW - BZ * 2, SH = PH - BZ * 2;
 const U = SW / 393, SHP = SH / U;
@@ -85,11 +96,12 @@ function txt(s, x, y, size, color, weight = 700, align = 'left', font = FONT) {
 function emoji(e, x, y, size) { txt(e, x, y, size, '#000', 400, 'center', EMOJI); }
 function grad(x0, y0, x1, y1, stops) { const g = ctx.createLinearGradient(x0, y0, x1, y1); stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c)); return g; }
 const BRAND = ['#7c3aed', '#ec4899', '#f97316'];
+const pulse = t => .5 + .5 * Math.sin(t * 9);
 
 function finger(t, t0, x, y) {
   if (t < t0 - .75 || t > t0 + .55) return;
   const a = easeOut(seg(t, t0 - .75, t0 - .35)) * (1 - seg(t, t0 + .3, t0 + .55));
-  const fx = lerp(x + 46, x, easeOut(seg(t, t0 - .75, t0 - .1))), fy = lerp(y + 70, y, easeOut(seg(t, t0 - .75, t0 - .1)));
+  const k = easeOut(seg(t, t0 - .75, t0 - .1)), fx = lerp(x + 46, x, k), fy = lerp(y + 70, y, k);
   const pressed = Math.abs(t - t0) < .13;
   ctx.save(); ctx.globalAlpha = a;
   if (t >= t0) {
@@ -97,23 +109,41 @@ function finger(t, t0, x, y) {
     ctx.beginPath(); ctx.arc(x, y, 20 + p * 34, 0, Math.PI * 2);
     ctx.strokeStyle = `rgba(255,255,255,${1 - p})`; ctx.lineWidth = 4; ctx.stroke();
   }
-  ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 10;
-  ctx.beginPath(); ctx.arc(fx, fy, pressed ? 17 : 21, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fill();
-  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+  fingerDot(fx, fy, pressed);
   ctx.restore();
 }
+function fingerDot(x, y, pressed) {
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(x, y, pressed ? 17 : 21, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.restore();
+}
 function statusBar(color) {
+  if (OS === 'android') {
+    txt('9:41', 30, 24, 14, color, 600);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(318, 30); ctx.lineTo(334, 30); ctx.lineTo(334, 16); ctx.closePath(); ctx.fill();
+    rr(346, 16, 9, 15, 2); ctx.fill();
+    return;
+  }
   txt('9:41', 52, 27, 16, color, 600, 'center');
   ctx.fillStyle = color;
   for (let i = 0; i < 4; i++) rr(300 + i * 6, 31 - i * 3, 4, 5 + i * 3, 1), ctx.fill();
   rr(334, 21, 26, 13, 4); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
   rr(336.5, 23.5, 19, 8, 2); ctx.fill();
 }
+function drawIcon(x, y, s, round) {
+  const img = round ? iconRound : icon;
+  if (!img.complete) return;
+  ctx.save();
+  if (round) { ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s / 2, 0, Math.PI * 2); } else rr(x, y, s, s, s * .23);
+  ctx.clip(); ctx.drawImage(img, x, y, s, s); ctx.restore();
+}
 
 /* ---------- background & frame ---------- */
 function background(T) {
-  ctx.fillStyle = grad(0, 0, W, H, ['#5b21b6', '#be185d', '#ea580c']); ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = grad(0, 0, W, H, OS === 'android' ? ['#4c1d95', '#be185d', '#0d9488'] : ['#5b21b6', '#be185d', '#ea580c']);
+  ctx.fillRect(0, 0, W, H);
   const blobs = [['#fde047', 820, 260, 320], ['#22d3ee', 160, 1500, 360], ['#a3e635', 900, 1350, 220], ['#f0abfc', 200, 380, 260]];
   blobs.forEach(([c, x, y, r], i) => {
     const bx = x + Math.sin(T * .5 + i * 1.7) * 60, by = y + Math.cos(T * .4 + i) * 50;
@@ -123,21 +153,23 @@ function background(T) {
   });
 }
 function phone(draw) {
+  const R = OS === 'android' ? 70 : 92;
   ctx.save();
   ctx.shadowColor = 'rgba(30,0,60,.55)'; ctx.shadowBlur = 90; ctx.shadowOffsetY = 36;
-  rr(PX, PY, PW, PH, 92); ctx.fillStyle = '#0b0a12'; ctx.fill();
+  rr(PX, PY, PW, PH, R); ctx.fillStyle = '#0b0a12'; ctx.fill();
   ctx.shadowColor = 'transparent';
-  ctx.lineWidth = 7; ctx.strokeStyle = '#4b4566'; ctx.stroke();
-  ctx.save(); rr(SX, SY, SW, SH, 78); ctx.clip();
+  ctx.lineWidth = 7; ctx.strokeStyle = OS === 'android' ? '#3f4a5a' : '#4b4566'; ctx.stroke();
+  ctx.save(); rr(SX, SY, SW, SH, R - 14); ctx.clip();
   ctx.translate(SX, SY); ctx.scale(U, U); draw();
   ctx.restore();
-  rr(PX + PW / 2 - 72, SY + 22, 144, 42, 21); ctx.fillStyle = '#000'; ctx.fill();
+  if (OS === 'android') { ctx.beginPath(); ctx.arc(PX + PW / 2, SY + 36, 15, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill(); }
+  else { rr(PX + PW / 2 - 72, SY + 22, 144, 42, 21); ctx.fillStyle = '#000'; ctx.fill(); }
   ctx.restore();
 }
 function caption(t, sc) {
   const a = easeOut(seg(t, 0, .5)), dy = (1 - a) * 40;
   ctx.save(); ctx.globalAlpha = a;
-  const label = `STEP ${sc.step} OF 7`;
+  const label = `STEP ${sc.step} OF ${STEPS}`;
   ctx.font = `800 34px ${FONT}`; const w = ctx.measureText(label).width + 56;
   rr(W / 2 - w / 2, 120 + dy, w, 62, 31); ctx.fillStyle = '#fff'; ctx.fill();
   txt(label, W / 2, 152 + dy, 34, '#7c3aed', 800, 'center');
@@ -148,30 +180,33 @@ function caption(t, sc) {
   ctx.restore();
 }
 
-/* ---------- iPhone screens (in points) ---------- */
+/* ---------- home screens ---------- */
 const GRID_APPS = [
   ['Camera', '📷', ['#6b7280', '#1f2937']], ['Photos', '🌸', ['#fff', '#f1f5f9']], ['Mail', '✉️', ['#60a5fa', '#2563eb']], ['Calendar', '📅', ['#fff', '#f1f5f9']],
   ['Weather', '⛅', ['#38bdf8', '#1d4ed8']], ['Maps', '🗺️', ['#86efac', '#16a34a']], ['Notes', '📝', ['#fef08a', '#facc15']], ['Settings', '⚙️', ['#9ca3af', '#4b5563']],
   ['Clock', '⏰', ['#1f2937', '#000']], ['Files', '📁', ['#93c5fd', '#3b82f6']], ['Calculator', '🧮', ['#f59e0b', '#c2410c']], ['Health', '❤️', ['#fff', '#fce7f3']],
 ];
-const DOCK_APPS = [['Phone', '📞', ['#4ade80', '#16a34a']], ['Safari', '🧭', ['#7dd3fc', '#2563eb']], ['Messages', '💬', ['#4ade80', '#15803d']], ['Music', '🎵', ['#fb7185', '#e11d48']]];
+const DOCK_IOS = [['📞', ['#4ade80', '#16a34a']], ['🧭', ['#7dd3fc', '#2563eb']], ['💬', ['#4ade80', '#15803d']], ['🎵', ['#fb7185', '#e11d48']]];
+const DOCK_ANDROID = [['📞', ['#4ade80', '#16a34a']], ['💬', ['#60a5fa', '#2563eb']], ['🌐', ['#fff', '#e2e8f0']], ['📷', ['#6b7280', '#1f2937']]];
+const BROWSER_DOCK = () => OS === 'android' ? 2 : 1;
 const gridPos = i => [26 + (i % 4) * 92, 74 + Math.floor(i / 4) * 106];
 const dockX = i => 12 + 369 * (i + .5) / 4;
+const dockY = () => OS === 'android' ? SHP - 170 : SHP - 97;
 function appIcon(x, y, e, cols, s = 62) {
-  rr(x, y, s, s, s * .23); ctx.fillStyle = grad(x, y, x, y + s, cols); ctx.fill();
+  if (OS === 'android') { ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s / 2, 0, Math.PI * 2); } else rr(x, y, s, s, s * .23);
+  ctx.fillStyle = grad(x, y, x, y + s, cols); ctx.fill();
   emoji(e, x + s / 2, y + s / 2 + 2, s * .5);
 }
 function homeScreen(t, o = {}) {
-  ctx.fillStyle = grad(0, 0, 393, SHP, ['#312e81', '#7c3aed', '#db2777']); ctx.fillRect(0, 0, 393, SHP);
+  ctx.fillStyle = grad(0, 0, 393, SHP, OS === 'android' ? ['#134e4a', '#4338ca', '#9d174d'] : ['#312e81', '#7c3aed', '#db2777']);
+  ctx.fillRect(0, 0, 393, SHP);
   const g = ctx.createRadialGradient(300, 200, 0, 300, 200, 300); g.addColorStop(0, 'rgba(251,191,36,.35)'); g.addColorStop(1, 'rgba(251,191,36,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, 393, SHP);
   statusBar('#fff');
   GRID_APPS.forEach(([n, e, c], i) => { const [x, y] = gridPos(i); appIcon(x, y, e, c); txt(n, x + 31, y + 76, 11.5, '#fff', 500, 'center'); });
-  if (o.prism != null && o.prism > 0) {
+  if (o.prism > 0) {
     const [x, y] = gridPos(12), s = backOut(o.prism);
-    ctx.save(); ctx.translate(x + 31, y + 31); ctx.scale(s, s);
-    if (icon.complete) { rr(-31, -31, 62, 62, 14); ctx.save(); ctx.clip(); ctx.drawImage(icon, -31, -31, 62, 62); ctx.restore(); }
-    ctx.restore();
+    ctx.save(); ctx.translate(x + 31, y + 31); ctx.scale(s, s); drawIcon(-31, -31, 62, OS === 'android'); ctx.restore();
     ctx.globalAlpha = clamp01(o.prism * 2); txt('Prism Scan', x + 31, y + 76, 11.5, '#fff', 600, 'center'); ctx.globalAlpha = 1;
     if (o.sparkle > 0 && o.sparkle < 1) {
       for (let k = 0; k < 8; k++) {
@@ -181,18 +216,31 @@ function homeScreen(t, o = {}) {
       ctx.globalAlpha = 1;
     }
   }
-  rr(12, SHP - 112, 369, 92, 30); ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill();
-  DOCK_APPS.forEach(([n, e, c], i) => {
-    const x = dockX(i) - 31, y = SHP - 97;
-    appIcon(x, y, e, c);
-    if (o.glow === i) { rr(x - 4, y - 4, 70, 70, 18); ctx.strokeStyle = '#fde047'; ctx.lineWidth = 4; ctx.stroke(); }
+  const dock = OS === 'android' ? DOCK_ANDROID : DOCK_IOS, dy = dockY();
+  if (OS === 'android') {
+    rr(20, SHP - 78, 353, 52, 26); ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fill();
+    txt('🔍  Search', 44, SHP - 52, 16, '#555', 500, 'left', `${FONT}, ${EMOJI}`);
+  } else { rr(12, SHP - 112, 369, 92, 30); ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill(); }
+  dock.forEach(([e, c], i) => {
+    const x = dockX(i) - 31;
+    appIcon(x, dy, e, c);
+    if (o.glow === i) {
+      if (OS === 'android') { ctx.beginPath(); ctx.arc(x + 31, dy + 31, 36, 0, 7); } else rr(x - 4, dy - 4, 70, 70, 18);
+      ctx.strokeStyle = '#fde047'; ctx.lineWidth = 4; ctx.stroke();
+    }
   });
+  if (o.toast > 0) {
+    ctx.globalAlpha = o.toast; rr(76, SHP - 150, 241, 40, 20); ctx.fillStyle = 'rgba(30,30,30,.9)'; ctx.fill();
+    txt('Prism Scan installed', 196, SHP - 130, 14, '#fff', 600, 'center'); ctx.globalAlpha = 1;
+  }
 }
-function appHome(bottom, standalone) {
-  ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, 0, 393, SHP);
-  rr(0, -30, 393, 290, 26); ctx.fillStyle = grad(0, 0, 393, 260, BRAND); ctx.fill();
+
+/* ---------- the app itself ---------- */
+function appHome(bottom, standalone, banner) {
+  ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, -200, 393, SHP + 400);
+  rr(0, -230, 393, 490, 26); ctx.fillStyle = grad(0, 0, 393, 260, BRAND); ctx.fill();
   ctx.fillStyle = 'rgba(253,224,71,.35)'; ctx.beginPath(); ctx.arc(350, 30, 80, 0, 7); ctx.fill();
-  if (icon.complete) { ctx.save(); rr(18, 58, 46, 46, 12); ctx.clip(); ctx.drawImage(icon, 18, 58, 46, 46); ctx.restore(); }
+  drawIcon(18, 58, 46, false);
   txt('Prism Scan', 76, 72, 24, '#fff', 800);
   txt('Scan · Enhance · Share', 77, 96, 12, 'rgba(255,255,255,.9)', 600);
   ['Documents', 'Pages', 'Storage'].forEach((l, i) => {
@@ -200,15 +248,25 @@ function appHome(bottom, standalone) {
     rr(x, 128, 112, 66, 14); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fill();
     txt(i === 2 ? '0 KB' : '0', x + 12, 152, 20, '#fff', 800); txt(l, x + 12, 178, 11, 'rgba(255,255,255,.9)', 600);
   });
-  rr(16, 230, 361, 44, 14); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#e7e1f7'; ctx.lineWidth = 2; ctx.stroke();
-  txt('🔍  Search documents', 30, 252, 15, '#9b92b8', 500);
-  emoji('📄✨', 196, 420, 40);
-  txt('No scans yet', 196, 472, 21, '#db2777', 800, 'center');
-  txt('Tap the big camera button to scan', 196, 500, 13, '#6d6488', 500, 'center');
+  let off = 0;
+  if (banner) {
+    rr(14, 272, 365, 46, 14); ctx.fillStyle = grad(14, 0, 379, 0, ['#dcfce7', '#cffafe']); ctx.fill();
+    txt('📲 Install Prism Scan as an app', 26, 295, 13, '#134e4a', 600, 'left', `${FONT}, ${EMOJI}`);
+    rr(262, 280, 76, 30, 15); ctx.fillStyle = grad(262, 280, 338, 310, ['#14b8a6', '#0ea5e9']); ctx.fill();
+    if (banner > 1) { rr(258, 276, 84, 38, 19); ctx.strokeStyle = `rgba(236,72,153,${banner - 1})`; ctx.lineWidth = 3; ctx.stroke(); }
+    txt('Install', 300, 295, 13, '#fff', 800, 'center');
+    txt('✕', 360, 295, 13, '#134e4a', 700, 'center');
+    off = 98;
+  }
+  rr(16, 230 + off, 361, 44, 14); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#e7e1f7'; ctx.lineWidth = 2; ctx.stroke();
+  txt('🔍  Search documents', 30, 252 + off, 15, '#9b92b8', 500, 'left', `${FONT}, ${EMOJI}`);
+  emoji('📄✨', 196, 420 + off / 2, 40);
+  txt('No scans yet', 196, 472 + off / 2, 21, '#db2777', 800, 'center');
+  txt('Tap the big camera button to scan', 196, 500 + off / 2, 13, '#6d6488', 500, 'center');
   const dy = bottom - 84;
   rr(16, dy, 361, 70, 24); ctx.fillStyle = '#fff'; ctx.fill();
-  appIconMini(70, dy + 35, '🖼️', ['#fbcfe8', '#f9a8d4']); txt('Photos', 70, dy + 60, 10, '#6d6488', 700, 'center');
-  appIconMini(323, dy + 35, '💡', ['#99f6e4', '#67e8f9']); txt('Tips', 323, dy + 60, 10, '#6d6488', 700, 'center');
+  miniIcon(70, dy + 35, '🖼️', ['#fbcfe8', '#f9a8d4']); txt('Photos', 70, dy + 60, 10, '#6d6488', 700, 'center');
+  miniIcon(323, dy + 35, '💡', ['#99f6e4', '#67e8f9']); txt('Tips', 323, dy + 60, 10, '#6d6488', 700, 'center');
   ctx.beginPath(); ctx.arc(196.5, dy + 6, 36, 0, 7); ctx.fillStyle = '#f6f3ff'; ctx.fill();
   ctx.beginPath(); ctx.arc(196.5, dy + 6, 31, 0, 7); ctx.fillStyle = grad(165, dy - 25, 228, dy + 37, BRAND); ctx.fill();
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(196.5, dy + 6, 9, 0, 7); ctx.stroke();
@@ -217,9 +275,21 @@ function appHome(bottom, standalone) {
   });
   if (standalone) statusBar('#fff');
 }
-function appIconMini(cx, cy, e, cols) { rr(cx - 17, cy - 22, 34, 34, 11); ctx.fillStyle = grad(cx, cy - 22, cx, cy + 12, cols); ctx.fill(); emoji(e, cx, cy - 4, 17); }
+function miniIcon(cx, cy, e, cols) { rr(cx - 17, cy - 22, 34, 34, 11); ctx.fillStyle = grad(cx, cy - 22, cx, cy + 12, cols); ctx.fill(); emoji(e, cx, cy - 4, 17); }
+function keyboard(goBlue) {
+  ctx.fillStyle = OS === 'android' ? '#e8eaed' : '#d1d3d9'; ctx.fillRect(0, SHP - 300, 393, 300);
+  ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].forEach((r, ri) => [...r].forEach((k, ki) => {
+    const kw = 33, gap = 6, off = (393 - (r.length * kw + (r.length - 1) * gap)) / 2;
+    const x = off + ki * (kw + gap), y = SHP - 288 + ri * 54;
+    rr(x, y, kw, 44, OS === 'android' ? 10 : 6); ctx.fillStyle = '#fff'; ctx.fill(); txt(k, x + kw / 2, y + 22, 19, '#111', 400, 'center');
+  }));
+  rr(98, SHP - 126, 196, 44, 8); ctx.fillStyle = '#fff'; ctx.fill(); txt('space', 196, SHP - 104, 15, '#111', 400, 'center');
+  rr(302, SHP - 126, 80, 44, 8); ctx.fillStyle = OS === 'android' ? '#1a73e8' : '#0a84ff'; ctx.fill();
+  txt(OS === 'android' ? '→' : 'go', 342, SHP - 104, 17, '#fff', 700, 'center');
+}
 
-function safariBar(urlText, cursor, menuGlow) {
+/* ---------- iPhone Safari ---------- */
+function safariBar(urlText, menuGlow) {
   ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.18)'; ctx.shadowBlur = 16;
   ctx.fillStyle = 'rgba(255,255,255,.96)';
   ctx.beginPath(); ctx.arc(40, SHP - 56, 23, 0, 7); ctx.fill();
@@ -227,10 +297,7 @@ function safariBar(urlText, cursor, menuGlow) {
   ctx.beginPath(); ctx.arc(354, SHP - 56, 23, 0, 7); ctx.fill();
   ctx.restore();
   txt('‹', 39, SHP - 59, 30, '#111', 400, 'center');
-  ctx.font = `500 14px ${FONT}`;
-  let s = urlText; while (ctx.measureText(s).width > 210 && s.length > 4) s = '…' + s.slice(2);
-  txt(s, 197, SHP - 56, 14, '#111', 500, 'center');
-  if (cursor) { const w = ctx.measureText(s).width; ctx.fillStyle = '#0a84ff'; ctx.fillRect(197 + w / 2 + 2, SHP - 66, 2, 20); }
+  txt(urlText, 197, SHP - 56, 14, '#111', 500, 'center');
   txt('•••', 354, SHP - 58, 16, '#111', 800, 'center');
   if (menuGlow) { ctx.beginPath(); ctx.arc(354, SHP - 56, 27, 0, 7); ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 3; ctx.stroke(); }
 }
@@ -240,17 +307,7 @@ function safariStart(typed, t) {
   txt('Favorites', 22, 110, 22, '#111', 800);
   const favs = [['🔎', '#e0e7ff'], ['📰', '#fde68a'], ['🎬', '#fecaca'], ['🛍️', '#bbf7d0'], ['📚', '#bae6fd'], ['🌐', '#e9d5ff'], ['🍳', '#fed7aa'], ['✈️', '#cffafe']];
   favs.forEach(([e, c], i) => { const x = 26 + (i % 4) * 90, y = 140 + Math.floor(i / 4) * 96; rr(x, y, 64, 64, 15); ctx.fillStyle = c; ctx.fill(); emoji(e, x + 32, y + 34, 28); });
-  // keyboard
-  rr(0, SHP - 330, 393, 330, 0); ctx.fillStyle = '#d1d3d9'; ctx.fillRect(0, SHP - 300, 393, 300);
-  const rows = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-  rows.forEach((r, ri) => [...r].forEach((k, ki) => {
-    const kw = 33, gap = 6, off = (393 - (r.length * kw + (r.length - 1) * gap)) / 2;
-    const x = off + ki * (kw + gap), y = SHP - 288 + ri * 54;
-    rr(x, y, kw, 44, 6); ctx.fillStyle = '#fff'; ctx.fill(); txt(k, x + kw / 2, y + 22, 19, '#111', 400, 'center');
-  }));
-  rr(98, SHP - 126, 196, 44, 6); ctx.fillStyle = '#fff'; ctx.fill(); txt('space', 196, SHP - 104, 15, '#111', 400, 'center');
-  rr(302, SHP - 126, 80, 44, 6); ctx.fillStyle = '#0a84ff'; ctx.fill(); txt('go', 342, SHP - 104, 16, '#fff', 600, 'center');
-  // address field above keyboard while typing
+  keyboard();
   ctx.fillStyle = '#f2f2f7'; ctx.fillRect(0, SHP - 360, 393, 60);
   rr(14, SHP - 354, 365, 46, 23); ctx.fillStyle = '#fff'; ctx.fill();
   txt(typed, 34, SHP - 331, 15, '#111', 500);
@@ -261,7 +318,7 @@ function safariLoaded(prog, menuGlow) {
   appHome(SHP - 92, false);
   statusBar('#fff');
   ctx.fillStyle = 'rgba(246,243,255,.9)'; ctx.fillRect(0, SHP - 96, 393, 96);
-  safariBar('razinraziq13.github.io', false, menuGlow);
+  safariBar('razinraziq13.github.io', menuGlow);
   if (prog < 1) { ctx.fillStyle = '#0a84ff'; ctx.fillRect(72, SHP - 36, 250 * prog, 3); }
 }
 function menuPanel(p, hi) {
@@ -283,7 +340,7 @@ function shareSheet(p, scroll, hiPulse) {
   const top = lerp(SHP, 120, easeOut(p));
   ctx.fillStyle = `rgba(0,0,0,${.35 * p})`; ctx.fillRect(0, 0, 393, SHP);
   rr(0, top, 393, SHP - top + 40, 16); ctx.fillStyle = '#f2f2f7'; ctx.fill();
-  if (icon.complete) { ctx.save(); rr(18, top + 18, 46, 46, 11); ctx.clip(); ctx.drawImage(icon, 18, top + 18, 46, 46); ctx.restore(); }
+  drawIcon(18, top + 18, 46, false);
   txt('Prism Scan', 76, top + 32, 15, '#111', 700); txt(LINK, 76, top + 52, 12, '#8e8e93', 500);
   ctx.beginPath(); ctx.arc(360, top + 36, 15, 0, 7); ctx.fillStyle = '#e3e3e8'; ctx.fill(); txt('✕', 360, top + 36, 13, '#666', 700, 'center');
   [['AirDrop', '📡', ['#60a5fa', '#2563eb']], ['Messages', '💬', ['#4ade80', '#15803d']], ['Mail', '✉️', ['#60a5fa', '#2563eb']], ['Notes', '📝', ['#fef08a', '#facc15']], ['More', '•••', ['#e5e7eb', '#d1d5db']]].forEach(([n, e, c], i) => {
@@ -315,7 +372,7 @@ function addDialog(p) {
   txt('Add to Home Screen', 196, top + 32, 16, '#111', 700, 'center');
   txt('Add', 372, top + 32, 16, '#0a84ff', 700, 'right');
   rr(14, top + 70, 365, 96, 14); ctx.fillStyle = '#fff'; ctx.fill();
-  if (icon.complete) { ctx.save(); rr(28, top + 88, 60, 60, 14); ctx.clip(); ctx.drawImage(icon, 28, top + 88, 60, 60); ctx.restore(); }
+  drawIcon(28, top + 88, 60, false);
   txt('Prism Scan', 104, top + 104, 17, '#111', 500); ctx.fillStyle = '#e5e5ea'; ctx.fillRect(104, top + 120, 262, 1);
   txt(LINK, 104, top + 140, 13, '#8e8e93', 400);
   txt('An icon will be added to your Home Screen so', 28, top + 192, 13, '#6e6e73', 400);
@@ -326,7 +383,52 @@ function addDialog(p) {
   ctx.beginPath(); ctx.arc(348.5, top + 262.5, 13.5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
   return top;
 }
-/* desk photo with a tilted page; corners in normalised photo coords */
+
+/* ---------- Android Chrome ---------- */
+function chromeTop(text, cursorOn) {
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 393, 104);
+  statusBar('#111');
+  txt('⌂', 24, 74, 22, '#444', 400, 'center');
+  rr(46, 52, 262, 44, 22); ctx.fillStyle = '#f1f3f4'; ctx.fill();
+  txt(text ? '🔒' : '', 64, 74, 12, '#555', 400, 'center', EMOJI);
+  ctx.font = `500 14px ${FONT}`;
+  let s = text; while (ctx.measureText(s).width > 210 && s.length > 4) s = '…' + s.slice(2);
+  txt(s || 'Search or type URL', 80, 74, 14, s ? '#111' : '#777', 500);
+  if (cursorOn) { const w = ctx.measureText(s).width; ctx.fillStyle = '#1a73e8'; ctx.fillRect(82 + w, 63, 2, 22); }
+  rr(318, 62, 22, 22, 5); ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.stroke(); txt('1', 329, 74, 12, '#444', 700, 'center');
+  txt('⋮', 367, 74, 24, '#444', 800, 'center');
+  ctx.fillStyle = '#e5e7eb'; ctx.fillRect(0, 103, 393, 1);
+}
+function chromeStart(typed, t) {
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 393, SHP);
+  chromeTop(typed, Math.floor(t * 3) % 2 === 0);
+  [['🔎', '#e8f0fe'], ['📰', '#fef7e0'], ['🎬', '#fce8e6'], ['🛍️', '#e6f4ea'], ['📚', '#e8f0fe'], ['🌐', '#f3e8fd'], ['🍳', '#fef7e0'], ['✈️', '#e6f4ea']]
+    .forEach(([e, c], i) => { const x = 36 + (i % 4) * 88, y = 170 + Math.floor(i / 4) * 96; ctx.beginPath(); ctx.arc(x + 26, y + 26, 28, 0, 7); ctx.fillStyle = c; ctx.fill(); emoji(e, x + 26, y + 28, 24); });
+  keyboard();
+}
+function chromeLoaded(prog, banner) {
+  ctx.save(); ctx.translate(0, 104); appHome(SHP - 104 - 16, false, banner); ctx.restore();
+  chromeTop('razinraziq13.github.io', false);
+  if (prog < 1) { ctx.fillStyle = '#1a73e8'; ctx.fillRect(0, 102, 393 * prog, 3); }
+}
+function installDialog(p, glow) {
+  if (p <= 0) return;
+  ctx.fillStyle = `rgba(0,0,0,${.45 * p})`; ctx.fillRect(0, 0, 393, SHP);
+  const s = lerp(.85, 1, easeOut(p));
+  ctx.save(); ctx.globalAlpha = p; ctx.translate(196.5, 430); ctx.scale(s, s); ctx.translate(-196.5, -430);
+  rr(34, 300, 325, 250, 28); ctx.fillStyle = '#fff'; ctx.fill();
+  txt('Install app', 60, 342, 22, '#111', 500);
+  drawIcon(60, 380, 52, true);
+  txt('Prism Scan', 128, 396, 17, '#111', 600);
+  txt('razinraziq13.github.io', 128, 420, 13, '#5f6368', 400);
+  txt('Cancel', 212, 508, 15, '#1a73e8', 600, 'center');
+  rr(262, 488, 80, 40, 20); ctx.fillStyle = '#1a73e8'; ctx.fill();
+  if (glow) { rr(257, 483, 90, 50, 25); ctx.strokeStyle = `rgba(236,72,153,${glow})`; ctx.lineWidth = 3; ctx.stroke(); }
+  txt('Install', 302, 508, 15, '#fff', 600, 'center');
+  ctx.restore();
+}
+
+/* ---------- shared: camera, crop, sign, PDF ---------- */
 const PAPER = [[.22, .2], [.8, .13], [.86, .83], [.19, .88]];
 function quadPt(q, u, v) {
   const top = [lerp(q[0][0], q[1][0], u), lerp(q[0][1], q[1][1], u)], bot = [lerp(q[3][0], q[2][0], u), lerp(q[3][1], q[2][1], u)];
@@ -345,13 +447,38 @@ function deskPhoto(x, y, w, h) {
   }
   return P;
 }
+function flatPage(x, y, w, h, sigP) {
+  ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#222'; ctx.fillRect(x + w * .1, y + h * .07, w * .5, h * .018);
+  for (let k = 0; k < 11; k++) ctx.fillRect(x + w * .1, y + h * (.14 + k * .055), w * (k % 3 === 2 ? .5 : .78), h * .007);
+  ctx.fillStyle = '#999'; ctx.fillRect(x + w * .55, y + h * .9, w * .36, 1.2);
+  txt('Signature', x + w * .55, y + h * .93, Math.max(7, w * .03), '#999', 500);
+  if (sigP > 0) signatureInk(x + w * .55, y + h * .8, w * .36, h * .1, sigP, '#1d4ed8', Math.max(1.4, w * .006));
+}
+/* a cursive-looking scribble used as the demo signature */
+function signatureInk(x, y, w, h, p, color, lw) {
+  const N = 140, n = Math.max(2, Math.floor(N * p));
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  let last = null;
+  for (let i = 0; i < n; i++) {
+    const u = i / (N - 1);
+    const px = x + w * (u * .92 + .03 * Math.sin(u * 40));
+    const py = y + h * (.55 - .32 * Math.sin(u * 19) * (1 - u * .3) - .12 * Math.cos(u * 47) + (u > .82 ? (u - .82) * 1.6 : 0));
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    last = [px, py];
+  }
+  ctx.stroke();
+  if (p > .9) { ctx.beginPath(); ctx.moveTo(x + w * .08, y + h * .95); ctx.quadraticCurveTo(x + w * .5, y + h * 1.05, x + w * .96, y + h * .82); ctx.stroke(); }
+  ctx.restore();
+  return last;
+}
 function cameraView(t, shutterAt) {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 393, SHP);
   deskPhoto(0, 96, 393, 610);
   txt('PHOTO', 196, 738, 13, '#fbbf24', 700, 'center');
   ctx.beginPath(); ctx.arc(196.5, 800, 36, 0, 7); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke();
-  const pr = Math.abs(t - shutterAt) < .12;
-  ctx.beginPath(); ctx.arc(196.5, 800, pr ? 26 : 30, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(196.5, 800, Math.abs(t - shutterAt) < .12 ? 26 : 30, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
   statusBar('#fff');
 }
 const HCOL = ['#a78bfa', '#f472b6', '#fb923c', '#2dd4bf'];
@@ -374,32 +501,36 @@ function cropView(t) {
     ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 7); ctx.fillStyle = HCOL[i]; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
   });
   const sa = seg(t, 1.4, 1.6) * (1 - seg(t, 2.6, 2.8));
-  if (sa > 0) { ctx.globalAlpha = sa; rr(116, 692, 162, 34, 17); ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fill(); txt('✅ Document found', 197, 709, 13, '#fff', 700, 'center'); ctx.globalAlpha = 1; }
+  if (sa > 0) { ctx.globalAlpha = sa; rr(116, 692, 162, 34, 17); ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fill(); txt('✅ Document found', 197, 709, 13, '#fff', 700, 'center', `${FONT}, ${EMOJI}`); ctx.globalAlpha = 1; }
   [['✨', 'Auto', ['#a78bfa', '#ec4899']], ['⛶', 'Full', ['#38bdf8', '#14b8a6']], ['↻', 'Rotate', ['#fbbf24', '#f97316']]].forEach(([e, l, c], i) => {
     const x = 20 + i * 60;
     rr(x, 758, 40, 40, 13); ctx.fillStyle = grad(x, 758, x + 40, 798, c); ctx.fill();
-    txt(e, x + 20, 779, 17, '#fff', 700, 'center'); txt(l, x + 20, 812, 10, '#a99fc8', 700, 'center');
+    txt(e, x + 20, 779, 17, '#fff', 700, 'center', `${FONT}, ${EMOJI}`); txt(l, x + 20, 812, 10, '#a99fc8', 700, 'center');
   });
   rr(204, 756, 172, 52, 16); ctx.fillStyle = grad(204, 756, 376, 808, BRAND); ctx.fill();
   txt('Next →', 290, 782, 16, '#fff', 800, 'center');
 }
-function docView(sheetP) {
+function actionBar(items, y, hiIdx, hiA) {
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, y, 393, SHP - y); ctx.fillStyle = '#e7e1f7'; ctx.fillRect(0, y, 393, 1);
+  const step = 393 / items.length;
+  items.forEach(([e, l, c], i) => {
+    const cx = step * (i + .5);
+    rr(cx - 22, y + 12, 44, 44, 15); ctx.fillStyle = grad(cx - 22, y + 12, cx + 22, y + 56, c); ctx.fill();
+    if (i === hiIdx && hiA > 0) { rr(cx - 27, y + 7, 54, 54, 18); ctx.strokeStyle = `rgba(236,72,153,${hiA})`; ctx.lineWidth = 3; ctx.stroke(); }
+    emoji(e, cx, y + 35, 19); txt(l, cx, y + 70, 11, '#6d6488', 700, 'center');
+  });
+}
+function docView(sheetP, signed) {
   ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, 0, 393, SHP);
   rr(0, -30, 393, 140, 22); ctx.fillStyle = grad(0, 0, 393, 110, BRAND); ctx.fill();
   statusBar('#fff');
   txt('‹', 24, 76, 30, '#fff', 400, 'center'); txt('Scan 15 Nov', 196, 78, 17, '#fff', 700, 'center'); txt('✎', 368, 78, 20, '#fff', 700, 'center');
-  txt('1 page · 86 KB · Today', 20, 138, 13, '#6d6488', 600);
+  txt('1 page · 92 KB · Today', 20, 138, 13, '#6d6488', 600);
   ctx.save(); ctx.shadowColor = 'rgba(76,29,149,.3)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
   rr(22, 164, 112, 150, 12); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
-  ctx.fillStyle = '#222'; ctx.fillRect(34, 182, 58, 5);
-  for (let k = 0; k < 10; k++) ctx.fillRect(34, 198 + k * 10, k % 3 === 2 ? 52 : 86, 2.5);
+  flatPage(26, 168, 104, 142, signed ? 1 : 0);
   ctx.beginPath(); ctx.arc(24, 166, 13, 0, 7); ctx.fillStyle = grad(11, 153, 37, 179, BRAND); ctx.fill(); txt('1', 24, 166, 12, '#fff', 800, 'center');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, SHP - 100, 393, 100); ctx.fillStyle = '#e7e1f7'; ctx.fillRect(0, SHP - 100, 393, 1);
-  [['📷', 'Add', ['#8b5cf6', '#ec4899']], ['🖼️', 'Photos', ['#f472b6', '#fb923c']], ['📕', 'PDF', ['#f43f5e', '#f97316']], ['🔤', 'Text', ['#0ea5e9', '#14b8a6']], ['🗑️', 'Delete', ['#64748b', '#ef4444']]].forEach(([e, l, c], i) => {
-    const cx = 39 + i * 78.75;
-    rr(cx - 22, SHP - 88, 44, 44, 15); ctx.fillStyle = grad(cx - 22, SHP - 88, cx + 22, SHP - 44, c); ctx.fill();
-    emoji(e, cx, SHP - 65, 19); txt(l, cx, SHP - 30, 11, '#6d6488', 700, 'center');
-  });
+  actionBar([['📷', 'Add', ['#8b5cf6', '#ec4899']], ['🖼️', 'Photos', ['#f472b6', '#fb923c']], ['📕', 'PDF', ['#f43f5e', '#f97316']], ['🔤', 'Text', ['#0ea5e9', '#14b8a6']], ['🗑️', 'Delete', ['#64748b', '#ef4444']]], SHP - 100);
   if (sheetP > 0) {
     const top = lerp(SHP, 430, easeOut(sheetP));
     ctx.fillStyle = `rgba(15,10,31,${.55 * sheetP})`; ctx.fillRect(0, 0, 393, SHP);
@@ -407,13 +538,67 @@ function docView(sheetP) {
     rr(174, top + 10, 44, 5, 3); ctx.fillStyle = '#e7e1f7'; ctx.fill();
     emoji('📕', 196, top + 66, 48);
     txt('PDF ready', 196, top + 122, 22, '#1e1537', 800, 'center');
-    txt('1 page · 89 KB', 196, top + 150, 14, '#6d6488', 500, 'center');
+    txt('1 page · 95 KB', 196, top + 150, 14, '#6d6488', 500, 'center');
     rr(20, top + 180, 353, 54, 16); ctx.fillStyle = grad(20, top + 180, 373, top + 234, BRAND); ctx.fill();
-    txt('📤 Share / Save to Files', 196, top + 207, 16, '#fff', 800, 'center');
+    txt('📤 Share / Save to Files', 196, top + 207, 16, '#fff', 800, 'center', `${FONT}, ${EMOJI}`);
     rr(20, top + 246, 353, 50, 14); ctx.fillStyle = '#f6f3ff'; ctx.fill(); txt('Open PDF', 196, top + 271, 15, '#1e1537', 700, 'center');
     return top;
   }
   return 0;
+}
+const PAGE_ACTIONS = [['◀', 'Move', ['#8b5cf6', '#ec4899']], ['▶', 'Move', ['#f472b6', '#fb923c']], ['✍️', 'Sign', ['#6366f1', '#a855f7']], ['🔤', 'Text', ['#0ea5e9', '#14b8a6']], ['📤', 'Share', ['#f43f5e', '#f97316']], ['🗑️', 'Delete', ['#64748b', '#ef4444']]];
+function pageView(t, signed) {
+  ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, 0, 393, SHP);
+  statusBar('#111');
+  txt('✕', 28, 70, 20, '#1e1537', 700, 'center'); txt('Page 1 of 1', 196, 70, 17, '#1e1537', 700, 'center');
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+  ctx.fillStyle = '#fff'; ctx.fillRect(46, 104, 300, 410 * 300 / 300 * 1.0); ctx.restore();
+  flatPage(46, 104, 300, 410, signed);
+  actionBar(PAGE_ACTIONS, SHP - 100, 2, t != null && t > .2 && t < .9 ? pulse(t) : 0);
+}
+function signScreen(boxP, boxX, boxY, applyGlow) {
+  ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, 0, 393, SHP);
+  statusBar('#111');
+  txt('✕', 28, 70, 20, '#1e1537', 700, 'center'); txt('Sign page', 196, 70, 17, '#1e1537', 700, 'center');
+  rr(8, 96, 377, 560, 22); ctx.fillStyle = grad(0, 96, 0, 656, ['#2e1065', '#0b0716']); ctx.fill();
+  const px = 56, py = 120, pw = 281, ph = 384;
+  flatPage(px, py, pw, ph, 0);
+  if (boxP > 0) {
+    const bw = pw * .4, bh = ph * .1, bx = px + pw * boxX, by = py + ph * boxY;
+    ctx.save(); ctx.globalAlpha = boxP;
+    ctx.setLineDash([6, 4]); rr(bx, by, bw, bh, 6); ctx.strokeStyle = '#f472b6'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+    signatureInk(bx + 4, by + 2, bw - 8, bh - 4, 1, '#1d4ed8', 1.8);
+    ctx.beginPath(); ctx.arc(bx + bw, by + bh, 11, 0, 7); ctx.fillStyle = grad(bx + bw - 11, by + bh - 11, bx + bw + 11, by + bh + 11, BRAND); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.restore();
+  }
+  rr(14, 672, 120, 64, 14); ctx.fillStyle = '#f6f3ff'; ctx.fill(); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+  txt('＋ New', 74, 704, 13, '#6d6488', 800, 'center');
+  rr(146, 672, 120, 64, 14); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = boxP > 0 ? '#ec4899' : '#e7e1f7'; ctx.lineWidth = 3; ctx.stroke();
+  signatureInk(158, 684, 96, 40, 1, '#1d4ed8', 1.6);
+  rr(20, SHP - 92, 44, 44, 14); ctx.fillStyle = grad(20, SHP - 92, 64, SHP - 48, ['#a78bfa', '#ec4899']); ctx.fill(); emoji('✍️', 42, SHP - 70, 19);
+  rr(150, SHP - 96, 226, 54, 16); ctx.fillStyle = grad(150, SHP - 96, 376, SHP - 42, BRAND); ctx.fill();
+  if (applyGlow) { rr(145, SHP - 101, 236, 64, 20); ctx.strokeStyle = `rgba(236,72,153,${applyGlow})`; ctx.lineWidth = 3; ctx.stroke(); }
+  txt('✓ Apply signature', 263, SHP - 69, 16, '#fff', 800, 'center');
+}
+function padSheet(p, inkP) {
+  const top = lerp(SHP, 360, easeOut(p));
+  ctx.fillStyle = `rgba(15,10,31,${.55 * p})`; ctx.fillRect(0, 0, 393, SHP);
+  rr(0, top, 393, SHP, 26); ctx.fillStyle = '#fff'; ctx.fill();
+  rr(174, top + 10, 44, 5, 3); ctx.fillStyle = '#e7e1f7'; ctx.fill();
+  txt('✍️ Draw your signature', 20, top + 46, 20, '#1e1537', 800, 'left', `${FONT}, ${EMOJI}`);
+  rr(18, top + 74, 357, 190, 18); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#f9a8d4'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.setLineDash([10, 6]); ctx.strokeStyle = '#d8b4fe'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(42, top + 222); ctx.lineTo(351, top + 222); ctx.stroke(); ctx.setLineDash([]);
+  let tip = null;
+  if (inkP > 0) tip = signatureInk(50, top + 110, 290, 110, inkP, '#1d4ed8', 4);
+  else txt('Sign here with your finger', 196, top + 160, 15, '#c4b5fd', 700, 'center');
+  ['#111827', '#1d4ed8', '#7c3aed', '#dc2626'].forEach((c, i) => {
+    ctx.beginPath(); ctx.arc(38 + i * 46, top + 300, 15, 0, 7); ctx.fillStyle = c; ctx.fill();
+    if (i === 1) { ctx.beginPath(); ctx.arc(38 + i * 46, top + 300, 20, 0, 7); ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 3; ctx.stroke(); }
+  });
+  rr(20, top + 340, 353, 54, 16); ctx.fillStyle = grad(20, top + 340, 373, top + 394, BRAND); ctx.fill();
+  txt('Save signature', 196, top + 367, 16, '#fff', 800, 'center');
+  return { top, tip };
 }
 
 /* ---------- scenes ---------- */
@@ -427,9 +612,9 @@ function intro(t) {
   const a = easeOut(seg(t, .7, 1.3));
   ctx.save(); ctx.globalAlpha = a; ctx.shadowColor = 'rgba(40,0,70,.45)'; ctx.shadowBlur = 24;
   txt('Prism Scan', W / 2, 1060 + (1 - a) * 40, 120, '#fff', 800, 'center');
-  txt('How to install it on your iPhone', W / 2, 1170 + (1 - a) * 40, 50, 'rgba(255,255,255,.95)', 600, 'center');
+  txt(OS === 'android' ? 'How to install it on Android' : 'How to install it on your iPhone', W / 2, 1170 + (1 - a) * 40, 50, 'rgba(255,255,255,.95)', 600, 'center');
   ctx.restore();
-  ['✅ Free', '🚫 No App Store', '📶 Works offline'].forEach((l, i) => {
+  ['✅ Free', '🚫 No app store', '✍️ Scan & sign'].forEach((l, i) => {
     const b = easeOut(seg(t, 1.4 + i * .25, 1.9 + i * .25));
     ctx.save(); ctx.globalAlpha = b;
     ctx.font = `700 40px ${FONT}, ${EMOJI}`; const w = ctx.measureText(l).width + 70;
@@ -440,18 +625,18 @@ function intro(t) {
     ctx.restore();
   });
 }
-function s1(t) {
-  if (t < 1.35) { homeScreen(t, { glow: t > .3 ? 1 : -1 }); finger(t, 1.0, dockX(1), SHP - 66); return; }
+/* iPhone install steps */
+function i1(t) {
+  if (t < 1.35) { homeScreen(t, { glow: t > .3 ? 1 : -1 }); finger(t, 1.0, dockX(1), dockY() + 31); return; }
   if (t < 4.3) {
-    const n = Math.round(LINK.length * seg(t, 1.7, 3.7));
-    safariStart(LINK.slice(0, n), t);
-    if (t > 1.35 && t < 1.7) { ctx.fillStyle = `rgba(255,255,255,${1 - seg(t, 1.35, 1.7)})`; ctx.fillRect(0, 0, 393, SHP); }
+    safariStart(LINK.slice(0, Math.round(LINK.length * seg(t, 1.7, 3.7))), t);
+    if (t < 1.7) { ctx.fillStyle = `rgba(255,255,255,${1 - seg(t, 1.35, 1.7)})`; ctx.fillRect(0, 0, 393, SHP); }
     finger(t, 4.0, 342, SHP - 104);
     return;
   }
   safariLoaded(seg(t, 4.3, 5.2), false);
 }
-function s2(t) {
+function i2(t) {
   safariLoaded(1, t > .4 && t < 1.0);
   finger(t, .9, 354, SHP - 56);
   const p = seg(t, 1.0, 1.35);
@@ -459,26 +644,53 @@ function s2(t) {
   menuPanel(p, t > 2.0);
   finger(t, 2.6, 230, SHP - 340);
 }
-function s3(t) {
+function i3(t) {
   safariLoaded(1, false);
-  const scroll = 110 * easeInOut(seg(t, 1.0, 2.2));
-  const pulse = t > 2.3 ? .5 + .5 * Math.sin((t - 2.3) * 9) : 0;
-  const rowY = shareSheet(seg(t, 0, .45), scroll, pulse);
+  const rowY = shareSheet(seg(t, 0, .45), 110 * easeInOut(seg(t, 1.0, 2.2)), t > 2.3 ? pulse(t) : 0);
   finger(t, 3.5, 200, rowY);
 }
-function s4(t) {
+function i4(t) {
   safariLoaded(1, false);
   const top = addDialog(seg(t, 0, .45));
-  if (t > 1.2 && t < 2.3) { ctx.save(); rr(306, top + 241, 64, 43, 21); ctx.strokeStyle = `rgba(236,72,153,${.5 + .5 * Math.sin(t * 9)})`; ctx.lineWidth = 3; ctx.stroke(); ctx.restore(); }
-  finger(t, 3.0, 372 - 16, top + 32);
+  if (t > 1.2 && t < 2.3) { rr(306, top + 241, 64, 43, 21); ctx.strokeStyle = `rgba(236,72,153,${pulse(t)})`; ctx.lineWidth = 3; ctx.stroke(); }
+  finger(t, 3.0, 356, top + 32);
 }
-function s5(t) {
-  homeScreen(t, { prism: seg(t, .5, 1.2), sparkle: seg(t, 1.0, 2.0) });
+/* Android install steps */
+function a1(t) {
+  if (t < 1.35) { homeScreen(t, { glow: t > .3 ? 2 : -1 }); finger(t, 1.0, dockX(2), dockY() + 31); return; }
+  if (t < 4.3) {
+    chromeStart(LINK.slice(0, Math.round(LINK.length * seg(t, 1.7, 3.7))), t);
+    if (t < 1.7) { ctx.fillStyle = `rgba(255,255,255,${1 - seg(t, 1.35, 1.7)})`; ctx.fillRect(0, 0, 393, SHP); }
+    finger(t, 4.0, 342, SHP - 104);
+    return;
+  }
+  chromeLoaded(seg(t, 4.3, 5.2), 0);
+}
+function a2(t) {
+  chromeLoaded(1, t > .3 ? (t > 1.0 && t < 2.3 ? 1 + pulse(t) : 1) : 0);
+  if (t < .3) return;
+  finger(t, 2.6, 300, 104 + 295);
+}
+function a3(t) {
+  chromeLoaded(1, 1);
+  installDialog(seg(t, 0, .4), t > 1.2 && t < 2.2 ? pulse(t) : 0);
+  finger(t, 2.6, 302, 508);
+}
+function a4(t) {
+  homeScreen(t, { prism: seg(t, .5, 1.2), sparkle: seg(t, 1.0, 2.0), toast: seg(t, .3, .6) * (1 - seg(t, 2.0, 2.4)) });
   const [x, y] = gridPos(12);
-  if (t > 2.2 && t < 3.3) { ctx.save(); rr(x - 5, y - 5, 72, 72, 19); ctx.strokeStyle = `rgba(253,224,71,${.5 + .5 * Math.sin(t * 8)})`; ctx.lineWidth = 4; ctx.stroke(); ctx.restore(); }
+  if (t > 2.2 && t < 3.3) { ctx.beginPath(); ctx.arc(x + 31, y + 31, 37, 0, 7); ctx.strokeStyle = `rgba(253,224,71,${pulse(t)})`; ctx.lineWidth = 4; ctx.stroke(); }
   finger(t, 3.7, x + 31, y + 31);
 }
-function s6(t) {
+/* iPhone "it's an app" */
+function i5(t) {
+  homeScreen(t, { prism: seg(t, .5, 1.2), sparkle: seg(t, 1.0, 2.0) });
+  const [x, y] = gridPos(12);
+  if (t > 2.2 && t < 3.3) { rr(x - 5, y - 5, 72, 72, 19); ctx.strokeStyle = `rgba(253,224,71,${pulse(t)})`; ctx.lineWidth = 4; ctx.stroke(); }
+  finger(t, 3.7, x + 31, y + 31);
+}
+/* shared app scenes */
+function sScan(t) {
   if (t < 1.6) {
     const [gx, gy] = gridPos(12), z = easeOut(seg(t, 0, .55));
     homeScreen(t, { prism: 1 });
@@ -499,9 +711,30 @@ function s6(t) {
   cropView(t - 3.1);
   finger(t, 6.3, 290, 782);
 }
-function s7(t) {
-  const top = docView(seg(t, 1.5, 1.9));
-  finger(t, 1.2, 196.5, SHP - 66);
+function sSign(t) {
+  if (t < 1.25) { pageView(t, 0); finger(t, .85, 196.5, SHP - 65); return; }
+  if (t < 4.0) {
+    signScreen(0);
+    const p = seg(t, 1.25, 1.6), inkP = easeInOut(seg(t, 1.8, 3.2));
+    const { top, tip } = padSheet(p, inkP);
+    if (tip && t > 1.75 && t < 3.3) fingerDot(tip[0] + 10, tip[1] + 14, true);
+    finger(t, 3.65, 196.5, top + 367);
+    return;
+  }
+  if (t < 6.1) {
+    const k = easeInOut(seg(t, 4.5, 5.2));
+    signScreen(seg(t, 4.0, 4.3), lerp(.5, .55, k), lerp(.62, .8, k), t > 5.3 && t < 5.9 ? pulse(t) : 0);
+    if (t > 4.4 && t < 5.25) fingerDot(56 + 281 * (lerp(.5, .55, k) + .2), 120 + 384 * (lerp(.62, .8, k) + .05), true);
+    finger(t, 5.8, 263, SHP - 69);
+    return;
+  }
+  pageView(null, 1);
+  const a = seg(t, 6.1, 6.3) * (1 - seg(t, 7.0, 7.3));
+  if (a > 0) { ctx.globalAlpha = a; rr(110, 30, 173, 40, 20); ctx.fillStyle = grad(110, 30, 283, 70, BRAND); ctx.fill(); txt('✍️ Page signed', 196.5, 50, 15, '#fff', 800, 'center', `${FONT}, ${EMOJI}`); ctx.globalAlpha = 1; }
+}
+function sPdf(t) {
+  const top = docView(seg(t, 1.5, 1.9), true);
+  finger(t, 1.2, 196.5, SHP - 65);
   if (top) finger(t, 3.7, 196.5, top + 207);
 }
 function outro(t) {
@@ -510,7 +743,10 @@ function outro(t) {
   txt('You’re all set! 🎉', W / 2, 330 + (1 - a) * 40, 96, '#fff', 800, 'center', `${FONT}, ${EMOJI}`);
   txt('3 quick tips', W / 2, 450, 48, 'rgba(255,255,255,.92)', 600, 'center');
   ctx.restore();
-  [['🧭', 'Install from Safari', 'Chrome on iPhone can’t install apps'], ['📶', 'Be online the first time', 'The edge finder downloads once'], ['📁', 'Save PDFs to Files', 'Keeps your scans safe']].forEach(([e, h, s], i) => {
+  const tips = OS === 'android'
+    ? [['🌐', 'Install from Chrome', 'Look for the green Install bar'], ['📶', 'Be online the first time', 'The edge finder downloads once'], ['📁', 'Save PDFs to Files', 'Or share them to Drive']]
+    : [['🧭', 'Install from Safari', 'Chrome on iPhone can’t install apps'], ['📶', 'Be online the first time', 'The edge finder downloads once'], ['📁', 'Save PDFs to Files', 'Keeps your scans safe']];
+  tips.forEach(([e, h, s], i) => {
     const b = easeOut(seg(t, .5 + i * .3, 1.1 + i * .3));
     const y = 560 + i * 300 + (1 - b) * 50;
     ctx.save(); ctx.globalAlpha = b;
@@ -529,18 +765,45 @@ function outro(t) {
   ctx.restore();
 }
 
-const SCENES = [
-  { d: 4.2, draw: intro },
-  { d: 6.4, step: 1, title: 'Open Safari', sub: 'Type the app link, then tap go', draw: s1 },
-  { d: 3.6, step: 2, title: 'Tap  •••  then Share', sub: 'Older iPhones: tap the Share button ⬆', draw: s2 },
-  { d: 4.4, step: 3, title: 'Add to Home Screen', sub: 'Scroll down the list and tap it', draw: s3 },
-  { d: 3.8, step: 4, title: 'Tap Add', sub: 'Leave “Open as Web App” switched on', draw: s4 },
-  { d: 4.2, step: 5, title: 'It’s now an app!', sub: 'Tap the new icon on your Home Screen', draw: s5 },
-  { d: 7.0, step: 6, title: 'Scan a document', sub: 'Snap a photo · corners are found for you', draw: s6 },
-  { d: 4.6, step: 7, title: 'Save as PDF', sub: 'Share it or save it to Files', draw: s7 },
-  { d: 5.2, draw: outro },
-];
-const TOTAL = SCENES.reduce((s, x) => s + x.d, 0);
+const SCENE_SETS = {
+  ios: [
+    { d: 4.2, draw: intro },
+    { d: 6.4, title: 'Open Safari', sub: 'Type the app link, then tap go', draw: i1 },
+    { d: 3.6, title: 'Tap  •••  then Share', sub: 'Older iPhones: tap the Share button ⬆', draw: i2 },
+    { d: 4.4, title: 'Add to Home Screen', sub: 'Scroll down the list and tap it', draw: i3 },
+    { d: 3.8, title: 'Tap Add', sub: 'Leave “Open as Web App” switched on', draw: i4 },
+    { d: 4.2, title: 'It’s now an app!', sub: 'Tap the new icon on your Home Screen', draw: i5 },
+    { d: 7.0, title: 'Scan a document', sub: 'Snap a photo · corners are found for you', draw: sScan },
+    { d: 7.4, title: 'Sign it', sub: 'Draw once, then drag it into place', draw: sSign },
+    { d: 4.6, title: 'Save as PDF', sub: 'Share it or save it to Files', draw: sPdf },
+    { d: 5.2, draw: outro },
+  ],
+  android: [
+    { d: 4.2, draw: intro },
+    { d: 6.4, title: 'Open Chrome', sub: 'Type the app link, then tap →', draw: a1 },
+    { d: 3.6, title: 'Tap Install', sub: 'No green bar? Tap  ⋮  then Install app', draw: a2 },
+    { d: 3.6, title: 'Tap Install again', sub: 'Chrome adds it like a normal app', draw: a3 },
+    { d: 4.2, title: 'It’s now an app!', sub: 'Tap the new icon on your home screen', draw: a4 },
+    { d: 7.0, title: 'Scan a document', sub: 'Snap a photo · corners are found for you', draw: sScan },
+    { d: 7.4, title: 'Sign it', sub: 'Draw once, then drag it into place', draw: sSign },
+    { d: 4.6, title: 'Save as PDF', sub: 'Share it or save it to Files', draw: sPdf },
+    { d: 5.2, draw: outro },
+  ],
+};
+let SCENES, TOTAL, STEPS;
+function setOS(os) {
+  OS = os;
+  SCENES = SCENE_SETS[os];
+  let n = 0; SCENES.forEach((s, i) => { if (i > 0 && i < SCENES.length - 1) s.step = ++n; });
+  STEPS = n; TOTAL = SCENES.reduce((s, x) => s + x.d, 0);
+  document.getElementById('os-ios').classList.toggle('on', os === 'ios');
+  document.getElementById('os-android').classList.toggle('on', os === 'android');
+  const dl = document.getElementById('dl');
+  dl.href = os === 'android' ? 'tutorial-android.mp4' : 'tutorial.mp4';
+  dl.download = os === 'android' ? 'Prism-Scan-Android-tutorial.mp4' : 'Prism-Scan-iPhone-tutorial.mp4';
+  dl.textContent = `⬇ Download ${os === 'android' ? 'Android' : 'iPhone'} video (MP4)`;
+  document.getElementById('subline').textContent = `A ${Math.round(TOTAL)}-second guide for ${os === 'android' ? 'Android' : 'iPhone'}`;
+}
 
 function render(T) {
   T = Math.max(0, Math.min(TOTAL - 1e-3, T));
@@ -569,31 +832,25 @@ function ui() {
 function loop(now) {
   if (!playing) return;
   pos = (now - startAt) / 1000;
-  if (pos >= TOTAL) { pos = TOTAL; playing = false; render(pos); ui(); if (window.__onEnd) window.__onEnd(); return; }
+  if (pos >= TOTAL) { pos = TOTAL; playing = false; render(pos); ui(); return; }
   render(pos); ui(); requestAnimationFrame(loop);
 }
 function play() { if (pos >= TOTAL) pos = 0; playing = true; startAt = performance.now() - pos * 1000; requestAnimationFrame(loop); ui(); }
 function pause() { playing = false; ui(); }
+function switchOS(os) {
+  pause(); setOS(os); pos = 0; render(1.6); ui();
+  try { history.replaceState(null, '', '?os=' + os); } catch { /* ignore */ }
+}
 document.getElementById('play').onclick = () => playing ? pause() : play();
 cv.onclick = () => playing ? pause() : play();
 document.getElementById('restart').onclick = () => { pos = 0; play(); };
 document.getElementById('seek').oninput = e => { pos = e.target.value / 1000 * TOTAL; if (playing) startAt = performance.now() - pos * 1000; else render(pos); ui(); };
-icon.onload = () => render(pos);
-render(0.95); pos = 0; ui();
+document.getElementById('os-ios').onclick = () => switchOS('ios');
+document.getElementById('os-android').onclick = () => switchOS('android');
+icon.onload = iconRound.onload = () => { if (!playing) render(pos || 1.6); };
+setOS(OS); render(1.6); ui();
 
-/* Records the whole animation to a video blob (used to make tutorial.mp4). */
-window.recordVideo = () => new Promise((resolve, reject) => {
-  const types = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1.4d002a', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-  const type = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
-  if (!type) return reject(new Error('Recording not supported'));
-  const rec = new MediaRecorder(cv.captureStream(30), { mimeType: type, videoBitsPerSecond: 9000000 });
-  const chunks = [];
-  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-  rec.onstop = () => resolve(new Blob(chunks, { type: type.split(';')[0] }));
-  window.__onEnd = () => setTimeout(() => { window.__onEnd = null; rec.stop(); }, 300);
-  pos = 0; render(0); rec.start(500); setTimeout(play, 150);
-});
-window.__tut = { render, TOTAL };
+window.__tut = { render, setOS, get TOTAL() { return TOTAL; } };
 </script>
 </body>
 </html>

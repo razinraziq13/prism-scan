@@ -1,8 +1,9 @@
 // Prism Scan service worker: makes the app open and work offline.
-const VERSION = 'prism-scan-v2';
+const VERSION = 'prism-scan-v3';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
+  './icons/icon-maskable-192.png', './icons/icon-maskable-512.png',
 ];
 const LIB_HOSTS = ['docs.opencv.org', 'cdn.jsdelivr.net', 'tessdata.projectnaptha.com', 'unpkg.com'];
 
