@@ -324,6 +324,7 @@ textarea {
 .progress span { position: relative; display: block; text-align: center; line-height: 22px; font-size: 12px; font-weight: 700; }
 .export-art { font-size: 56px; text-align: center; margin-top: 4px; }
 #sheet-export h3, #sheet-export p { text-align: center; }
+.video-link { display: block; text-align: center; text-decoration: none; color: var(--text); }
 .tips { padding-left: 20px; line-height: 1.55; margin: 0; }
 .tips li { margin-bottom: 8px; }
 .tips li::marker { color: var(--pink); }

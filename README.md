@@ -12,6 +12,8 @@ A colorful document scanner that runs entirely in the browser and installs on iP
 
 ## Install on iPhone
 
+▶️ Watch the [install tutorial](https://razinraziq13.github.io/prism-scan/tutorial.html) or download the [MP4 video](tutorial.mp4).
+
 1. Open the GitHub Pages link in **Safari**.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
 

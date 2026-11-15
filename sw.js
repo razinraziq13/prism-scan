@@ -1,5 +1,5 @@
 // Prism Scan service worker: makes the app open and work offline.
-const VERSION = 'prism-scan-v1';
+const VERSION = 'prism-scan-v2';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
@@ -38,10 +38,13 @@ self.addEventListener('fetch', e => {
   // App files: serve from cache instantly, refresh in the background.
   if (url.origin === self.location.origin) {
     e.respondWith(caches.open(VERSION).then(async c => {
-      const hit = await c.match(req, { ignoreSearch: true }) ||
-        (req.mode === 'navigate' ? await c.match('./index.html') : null);
+      const hit = await c.match(req, { ignoreSearch: true });
       const net = fetch(req).then(res => { if (res.ok) c.put(req, res.clone()); return res; }).catch(() => null);
-      return hit || (await net) || new Response('Offline', { status: 503 });
+      if (hit) return hit;
+      const res = await net;
+      if (res) return res;
+      if (req.mode === 'navigate') { const home = await c.match('./index.html'); if (home) return home; }
+      return new Response('Offline', { status: 503 });
     }));
   }
 });

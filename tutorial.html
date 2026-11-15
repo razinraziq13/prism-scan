@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Install Tutorial</title>
+<meta name="theme-color" content="#7c3aed">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root { --bg: #140c29; --text: #f6f2ff; --muted: #b9addb; --grad: linear-gradient(135deg, #7c3aed, #ec4899 55%, #f97316); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: radial-gradient(circle at 20% 0%, #3b1a7a 0%, var(--bg) 55%);
+    color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  }
+  h1 { margin: 6px 0 4px; font-size: 22px; text-align: center; }
+  p.sub { margin: 0 0 14px; color: var(--muted); font-size: 14px; text-align: center; }
+  .player { width: 100%; max-width: 420px; }
+  canvas {
+    display: block; width: 100%; height: auto; aspect-ratio: 9 / 16; max-height: 72vh; object-fit: contain;
+    border-radius: 22px; box-shadow: 0 20px 60px -15px rgba(236,72,153,.55); background: #000; cursor: pointer;
+  }
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .controls button {
+    width: 46px; height: 46px; border-radius: 14px; border: 0; color: #fff; font-size: 18px; cursor: pointer;
+    background: var(--grad); flex-shrink: 0;
+  }
+  .controls button.alt { background: rgba(255,255,255,.12); }
+  input[type=range] { flex: 1; accent-color: #ec4899; }
+  .time { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); width: 74px; text-align: right; }
+  .links { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; width: 100%; max-width: 420px; }
+  .links a {
+    display: block; text-align: center; padding: 14px; border-radius: 16px; font-weight: 700; text-decoration: none; color: #fff;
+  }
+  .links a.primary { background: var(--grad); }
+  .links a.ghost { background: rgba(255,255,255,.1); }
+</style>
+</head>
+<body>
+  <h1>How to install Prism Scan</h1>
+  <p class="sub">A 45-second guide for iPhone</p>
+  <div class="player">
+    <canvas id="v" width="1080" height="1920" aria-label="Animated install tutorial"></canvas>
+    <div class="controls">
+      <button id="play" aria-label="Play">▶</button>
+      <button id="restart" class="alt" aria-label="Restart">↺</button>
+      <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+      <span class="time" id="time">0:00 / 0:00</span>
+    </div>
+  </div>
+  <div class="links">
+    <a class="primary" href="tutorial.mp4" download="Prism-Scan-install-tutorial.mp4">⬇ Download video (MP4)</a>
+    <a class="ghost" href="./">Open Prism Scan →</a>
+  </div>
+
+<script>
+'use strict';
+const W = 1080, H = 1920;
+const cv = document.getElementById('v'), ctx = cv.getContext('2d');
+const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif';
+const EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+const LINK = 'razinraziq13.github.io/prism-scan';
+const icon = new Image(); icon.src = 'icons/icon-512.png';
+
+/* phone geometry: screen content is drawn in iPhone points (393 x 866) */
+const PX = 250, PY = 560, PW = 580, PH = 1240, BZ = 16;
+const SX = PX + BZ, SY = PY + BZ, SW = PW - BZ * 2, SH = PH - BZ * 2;
+const U = SW / 393, SHP = SH / U;
+
+/* ---------- helpers ---------- */
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const seg = (t, a, b) => clamp01((t - a) / (b - a));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const backOut = x => { const c1 = 1.9, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const lerp = (a, b, t) => a + (b - a) * t;
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function txt(s, x, y, size, color, weight = 700, align = 'left', font = FONT) {
+  ctx.font = `${weight} ${size}px ${font}`; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+}
+function emoji(e, x, y, size) { txt(e, x, y, size, '#000', 400, 'center', EMOJI); }
+function grad(x0, y0, x1, y1, stops) { const g = ctx.createLinearGradient(x0, y0, x1, y1); stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c)); return g; }
+const BRAND = ['#7c3aed', '#ec4899', '#f97316'];
+
+function finger(t, t0, x, y) {
+  if (t < t0 - .75 || t > t0 + .55) return;
+  const a = easeOut(seg(t, t0 - .75, t0 - .35)) * (1 - seg(t, t0 + .3, t0 + .55));
+  const fx = lerp(x + 46, x, easeOut(seg(t, t0 - .75, t0 - .1))), fy = lerp(y + 70, y, easeOut(seg(t, t0 - .75, t0 - .1)));
+  const pressed = Math.abs(t - t0) < .13;
+  ctx.save(); ctx.globalAlpha = a;
+  if (t >= t0) {
+    const p = seg(t, t0, t0 + .45);
+    ctx.beginPath(); ctx.arc(x, y, 20 + p * 34, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,255,${1 - p})`; ctx.lineWidth = 4; ctx.stroke();
+  }
+  ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(fx, fy, pressed ? 17 : 21, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.restore();
+}
+function statusBar(color) {
+  txt('9:41', 52, 27, 16, color, 600, 'center');
+  ctx.fillStyle = color;
+  for (let i = 0; i < 4; i++) rr(300 + i * 6, 31 - i * 3, 4, 5 + i * 3, 1), ctx.fill();
+  rr(334, 21, 26, 13, 4); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  rr(336.5, 23.5, 19, 8, 2); ctx.fill();
+}
+
+/* ---------- background & frame ---------- */
+function background(T) {
+  ctx.fillStyle = grad(0, 0, W, H, ['#5b21b6', '#be185d', '#ea580c']); ctx.fillRect(0, 0, W, H);
+  const blobs = [['#fde047', 820, 260, 320], ['#22d3ee', 160, 1500, 360], ['#a3e635', 900, 1350, 220], ['#f0abfc', 200, 380, 260]];
+  blobs.forEach(([c, x, y, r], i) => {
+    const bx = x + Math.sin(T * .5 + i * 1.7) * 60, by = y + Math.cos(T * .4 + i) * 50;
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+    g.addColorStop(0, c + '66'); g.addColorStop(1, c + '00');
+    ctx.fillStyle = g; ctx.fillRect(bx - r, by - r, r * 2, r * 2);
+  });
+}
+function phone(draw) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(30,0,60,.55)'; ctx.shadowBlur = 90; ctx.shadowOffsetY = 36;
+  rr(PX, PY, PW, PH, 92); ctx.fillStyle = '#0b0a12'; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 7; ctx.strokeStyle = '#4b4566'; ctx.stroke();
+  ctx.save(); rr(SX, SY, SW, SH, 78); ctx.clip();
+  ctx.translate(SX, SY); ctx.scale(U, U); draw();
+  ctx.restore();
+  rr(PX + PW / 2 - 72, SY + 22, 144, 42, 21); ctx.fillStyle = '#000'; ctx.fill();
+  ctx.restore();
+}
+function caption(t, sc) {
+  const a = easeOut(seg(t, 0, .5)), dy = (1 - a) * 40;
+  ctx.save(); ctx.globalAlpha = a;
+  const label = `STEP ${sc.step} OF 7`;
+  ctx.font = `800 34px ${FONT}`; const w = ctx.measureText(label).width + 56;
+  rr(W / 2 - w / 2, 120 + dy, w, 62, 31); ctx.fillStyle = '#fff'; ctx.fill();
+  txt(label, W / 2, 152 + dy, 34, '#7c3aed', 800, 'center');
+  ctx.shadowColor = 'rgba(40,0,70,.45)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 6;
+  txt(sc.title, W / 2, 275 + dy, 84, '#fff', 800, 'center');
+  ctx.shadowBlur = 10;
+  txt(sc.sub, W / 2, 380 + dy, 44, 'rgba(255,255,255,.92)', 600, 'center');
+  ctx.restore();
+}
+
+/* ---------- iPhone screens (in points) ---------- */
+const GRID_APPS = [
+  ['Camera', '📷', ['#6b7280', '#1f2937']], ['Photos', '🌸', ['#fff', '#f1f5f9']], ['Mail', '✉️', ['#60a5fa', '#2563eb']], ['Calendar', '📅', ['#fff', '#f1f5f9']],
+  ['Weather', '⛅', ['#38bdf8', '#1d4ed8']], ['Maps', '🗺️', ['#86efac', '#16a34a']], ['Notes', '📝', ['#fef08a', '#facc15']], ['Settings', '⚙️', ['#9ca3af', '#4b5563']],
+  ['Clock', '⏰', ['#1f2937', '#000']], ['Files', '📁', ['#93c5fd', '#3b82f6']], ['Calculator', '🧮', ['#f59e0b', '#c2410c']], ['Health', '❤️', ['#fff', '#fce7f3']],
+];
+const DOCK_APPS = [['Phone', '📞', ['#4ade80', '#16a34a']], ['Safari', '🧭', ['#7dd3fc', '#2563eb']], ['Messages', '💬', ['#4ade80', '#15803d']], ['Music', '🎵', ['#fb7185', '#e11d48']]];
+const gridPos = i => [26 + (i % 4) * 92, 74 + Math.floor(i / 4) * 106];
+const dockX = i => 12 + 369 * (i + .5) / 4;
+function appIcon(x, y, e, cols, s = 62) {
+  rr(x, y, s, s, s * .23); ctx.fillStyle = grad(x, y, x, y + s, cols); ctx.fill();
+  emoji(e, x + s / 2, y + s / 2 + 2, s * .5);
+}
+function homeScreen(t, o = {}) {
+  ctx.fillStyle = grad(0, 0, 393, SHP, ['#312e81', '#7c3aed', '#db2777']); ctx.fillRect(0, 0, 393, SHP);
+  const g = ctx.createRadialGradient(300, 200, 0, 300, 200, 300); g.addColorStop(0, 'rgba(251,191,36,.35)'); g.addColorStop(1, 'rgba(251,191,36,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 393, SHP);
+  statusBar('#fff');
+  GRID_APPS.forEach(([n, e, c], i) => { const [x, y] = gridPos(i); appIcon(x, y, e, c); txt(n, x + 31, y + 76, 11.5, '#fff', 500, 'center'); });
+  if (o.prism != null && o.prism > 0) {
+    const [x, y] = gridPos(12), s = backOut(o.prism);
+    ctx.save(); ctx.translate(x + 31, y + 31); ctx.scale(s, s);
+    if (icon.complete) { rr(-31, -31, 62, 62, 14); ctx.save(); ctx.clip(); ctx.drawImage(icon, -31, -31, 62, 62); ctx.restore(); }
+    ctx.restore();
+    ctx.globalAlpha = clamp01(o.prism * 2); txt('Prism Scan', x + 31, y + 76, 11.5, '#fff', 600, 'center'); ctx.globalAlpha = 1;
+    if (o.sparkle > 0 && o.sparkle < 1) {
+      for (let k = 0; k < 8; k++) {
+        const ang = k / 8 * Math.PI * 2, d = 40 + o.sparkle * 45;
+        ctx.globalAlpha = 1 - o.sparkle; emoji(k % 2 ? '✨' : '⭐', x + 31 + Math.cos(ang) * d, y + 31 + Math.sin(ang) * d, 16);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+  rr(12, SHP - 112, 369, 92, 30); ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill();
+  DOCK_APPS.forEach(([n, e, c], i) => {
+    const x = dockX(i) - 31, y = SHP - 97;
+    appIcon(x, y, e, c);
+    if (o.glow === i) { rr(x - 4, y - 4, 70, 70, 18); ctx.strokeStyle = '#fde047'; ctx.lineWidth = 4; ctx.stroke(); }
+  });
+}
+function appHome(bottom, standalone) {
+  ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, 0, 393, SHP);
+  rr(0, -30, 393, 290, 26); ctx.fillStyle = grad(0, 0, 393, 260, BRAND); ctx.fill();
+  ctx.fillStyle = 'rgba(253,224,71,.35)'; ctx.beginPath(); ctx.arc(350, 30, 80, 0, 7); ctx.fill();
+  if (icon.complete) { ctx.save(); rr(18, 58, 46, 46, 12); ctx.clip(); ctx.drawImage(icon, 18, 58, 46, 46); ctx.restore(); }
+  txt('Prism Scan', 76, 72, 24, '#fff', 800);
+  txt('Scan · Enhance · Share', 77, 96, 12, 'rgba(255,255,255,.9)', 600);
+  ['Documents', 'Pages', 'Storage'].forEach((l, i) => {
+    const x = 18 + i * 122;
+    rr(x, 128, 112, 66, 14); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fill();
+    txt(i === 2 ? '0 KB' : '0', x + 12, 152, 20, '#fff', 800); txt(l, x + 12, 178, 11, 'rgba(255,255,255,.9)', 600);
+  });
+  rr(16, 230, 361, 44, 14); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#e7e1f7'; ctx.lineWidth = 2; ctx.stroke();
+  txt('🔍  Search documents', 30, 252, 15, '#9b92b8', 500);
+  emoji('📄✨', 196, 420, 40);
+  txt('No scans yet', 196, 472, 21, '#db2777', 800, 'center');
+  txt('Tap the big camera button to scan', 196, 500, 13, '#6d6488', 500, 'center');
+  const dy = bottom - 84;
+  rr(16, dy, 361, 70, 24); ctx.fillStyle = '#fff'; ctx.fill();
+  appIconMini(70, dy + 35, '🖼️', ['#fbcfe8', '#f9a8d4']); txt('Photos', 70, dy + 60, 10, '#6d6488', 700, 'center');
+  appIconMini(323, dy + 35, '💡', ['#99f6e4', '#67e8f9']); txt('Tips', 323, dy + 60, 10, '#6d6488', 700, 'center');
+  ctx.beginPath(); ctx.arc(196.5, dy + 6, 36, 0, 7); ctx.fillStyle = '#f6f3ff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(196.5, dy + 6, 31, 0, 7); ctx.fillStyle = grad(165, dy - 25, 228, dy + 37, BRAND); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(196.5, dy + 6, 9, 0, 7); ctx.stroke();
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => {
+    ctx.beginPath(); ctx.moveTo(196.5 + sx * 15, dy + 6 + sy * 8); ctx.lineTo(196.5 + sx * 15, dy + 6 + sy * 15); ctx.lineTo(196.5 + sx * 8, dy + 6 + sy * 15); ctx.stroke();
+  });
+  if (standalone) statusBar('#fff');
+}
+function appIconMini(cx, cy, e, cols) { rr(cx - 17, cy - 22, 34, 34, 11); ctx.fillStyle = grad(cx, cy - 22, cx, cy + 12, cols); ctx.fill(); emoji(e, cx, cy - 4, 17); }
+
+function safariBar(urlText, cursor, menuGlow) {
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.18)'; ctx.shadowBlur = 16;
+  ctx.fillStyle = 'rgba(255,255,255,.96)';
+  ctx.beginPath(); ctx.arc(40, SHP - 56, 23, 0, 7); ctx.fill();
+  rr(72, SHP - 79, 250, 46, 23); ctx.fill();
+  ctx.beginPath(); ctx.arc(354, SHP - 56, 23, 0, 7); ctx.fill();
+  ctx.restore();
+  txt('‹', 39, SHP - 59, 30, '#111', 400, 'center');
+  ctx.font = `500 14px ${FONT}`;
+  let s = urlText; while (ctx.measureText(s).width > 210 && s.length > 4) s = '…' + s.slice(2);
+  txt(s, 197, SHP - 56, 14, '#111', 500, 'center');
+  if (cursor) { const w = ctx.measureText(s).width; ctx.fillStyle = '#0a84ff'; ctx.fillRect(197 + w / 2 + 2, SHP - 66, 2, 20); }
+  txt('•••', 354, SHP - 58, 16, '#111', 800, 'center');
+  if (menuGlow) { ctx.beginPath(); ctx.arc(354, SHP - 56, 27, 0, 7); ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 3; ctx.stroke(); }
+}
+function safariStart(typed, t) {
+  ctx.fillStyle = '#f2f2f7'; ctx.fillRect(0, 0, 393, SHP);
+  statusBar('#111');
+  txt('Favorites', 22, 110, 22, '#111', 800);
+  const favs = [['🔎', '#e0e7ff'], ['📰', '#fde68a'], ['🎬', '#fecaca'], ['🛍️', '#bbf7d0'], ['📚', '#bae6fd'], ['🌐', '#e9d5ff'], ['🍳', '#fed7aa'], ['✈️', '#cffafe']];
+  favs.forEach(([e, c], i) => { const x = 26 + (i % 4) * 90, y = 140 + Math.floor(i / 4) * 96; rr(x, y, 64, 64, 15); ctx.fillStyle = c; ctx.fill(); emoji(e, x + 32, y + 34, 28); });
+  // keyboard
+  rr(0, SHP - 330, 393, 330, 0); ctx.fillStyle = '#d1d3d9'; ctx.fillRect(0, SHP - 300, 393, 300);
+  const rows = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  rows.forEach((r, ri) => [...r].forEach((k, ki) => {
+    const kw = 33, gap = 6, off = (393 - (r.length * kw + (r.length - 1) * gap)) / 2;
+    const x = off + ki * (kw + gap), y = SHP - 288 + ri * 54;
+    rr(x, y, kw, 44, 6); ctx.fillStyle = '#fff'; ctx.fill(); txt(k, x + kw / 2, y + 22, 19, '#111', 400, 'center');
+  }));
+  rr(98, SHP - 126, 196, 44, 6); ctx.fillStyle = '#fff'; ctx.fill(); txt('space', 196, SHP - 104, 15, '#111', 400, 'center');
+  rr(302, SHP - 126, 80, 44, 6); ctx.fillStyle = '#0a84ff'; ctx.fill(); txt('go', 342, SHP - 104, 16, '#fff', 600, 'center');
+  // address field above keyboard while typing
+  ctx.fillStyle = '#f2f2f7'; ctx.fillRect(0, SHP - 360, 393, 60);
+  rr(14, SHP - 354, 365, 46, 23); ctx.fillStyle = '#fff'; ctx.fill();
+  txt(typed, 34, SHP - 331, 15, '#111', 500);
+  ctx.font = `500 15px ${FONT}`; const w = ctx.measureText(typed).width;
+  if (Math.floor(t * 3) % 2 === 0) { ctx.fillStyle = '#0a84ff'; ctx.fillRect(36 + w, SHP - 343, 2, 22); }
+}
+function safariLoaded(prog, menuGlow) {
+  appHome(SHP - 92, false);
+  statusBar('#fff');
+  ctx.fillStyle = 'rgba(246,243,255,.9)'; ctx.fillRect(0, SHP - 96, 393, 96);
+  safariBar('razinraziq13.github.io', false, menuGlow);
+  if (prog < 1) { ctx.fillStyle = '#0a84ff'; ctx.fillRect(72, SHP - 36, 250 * prog, 3); }
+}
+function menuPanel(p, hi) {
+  if (p <= 0) return;
+  const s = easeOut(p);
+  ctx.save(); ctx.globalAlpha = p; ctx.translate(354, SHP - 80); ctx.scale(s, s); ctx.translate(-354, -(SHP - 80));
+  ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 30;
+  const x = 128, y = SHP - 372, w = 252, rows = [['Share', '⬆️'], ['Add to Bookmarks', '📖'], ['Add to Reading List', '👓'], ['Find on Page', '🔍'], ['Request Desktop Website', '🖥️']];
+  rr(x, y, w, rows.length * 52 + 12, 22); ctx.fillStyle = 'rgba(250,250,252,.98)'; ctx.fill(); ctx.shadowColor = 'transparent';
+  rows.forEach(([l, e], i) => {
+    const ry = y + 6 + i * 52;
+    if (i === 0 && hi) { rr(x + 6, ry, w - 12, 50, 14); ctx.fillStyle = 'rgba(236,72,153,.16)'; ctx.fill(); }
+    emoji(e, x + 30, ry + 26, 17); txt(l, x + 54, ry + 26, 15, '#111', i === 0 ? 700 : 500);
+  });
+  ctx.restore();
+}
+const SHARE_ROWS = [['Copy', '📋'], ['Add to Reading List', '👓'], ['Add Bookmark', '📖'], ['Add to Favorites', '⭐'], ['Add to Quick Note', '🗒️'], ['Find on Page', '🔍'], ['Add to Home Screen', '➕'], ['Markup', '✏️'], ['Print', '🖨️']];
+function shareSheet(p, scroll, hiPulse) {
+  const top = lerp(SHP, 120, easeOut(p));
+  ctx.fillStyle = `rgba(0,0,0,${.35 * p})`; ctx.fillRect(0, 0, 393, SHP);
+  rr(0, top, 393, SHP - top + 40, 16); ctx.fillStyle = '#f2f2f7'; ctx.fill();
+  if (icon.complete) { ctx.save(); rr(18, top + 18, 46, 46, 11); ctx.clip(); ctx.drawImage(icon, 18, top + 18, 46, 46); ctx.restore(); }
+  txt('Prism Scan', 76, top + 32, 15, '#111', 700); txt(LINK, 76, top + 52, 12, '#8e8e93', 500);
+  ctx.beginPath(); ctx.arc(360, top + 36, 15, 0, 7); ctx.fillStyle = '#e3e3e8'; ctx.fill(); txt('✕', 360, top + 36, 13, '#666', 700, 'center');
+  [['AirDrop', '📡', ['#60a5fa', '#2563eb']], ['Messages', '💬', ['#4ade80', '#15803d']], ['Mail', '✉️', ['#60a5fa', '#2563eb']], ['Notes', '📝', ['#fef08a', '#facc15']], ['More', '•••', ['#e5e7eb', '#d1d5db']]].forEach(([n, e, c], i) => {
+    const x = 18 + i * 76;
+    rr(x, top + 88, 58, 58, 14); ctx.fillStyle = grad(x, top + 88, x, top + 146, c); ctx.fill();
+    if (e === '•••') txt(e, x + 29, top + 116, 16, '#555', 800, 'center'); else emoji(e, x + 29, top + 118, 27);
+    txt(n, x + 29, top + 162, 11, '#333', 500, 'center');
+  });
+  ctx.save(); ctx.beginPath(); ctx.rect(0, top + 186, 393, SHP); ctx.clip();
+  const ly = top + 196 - scroll;
+  rr(14, ly, 365, SHARE_ROWS.length * 50, 14); ctx.fillStyle = '#fff'; ctx.fill();
+  SHARE_ROWS.forEach(([l, e], i) => {
+    const y = ly + i * 50;
+    if (i === 6 && hiPulse > 0) {
+      rr(18, y + 3, 357, 44, 11); ctx.fillStyle = `rgba(236,72,153,${.1 + .12 * hiPulse})`; ctx.fill();
+      ctx.strokeStyle = grad(18, y, 375, y, BRAND); ctx.lineWidth = 2.5; ctx.stroke();
+    }
+    txt(l, 32, y + 25, 16, '#111', i === 6 ? 700 : 400); emoji(e, 350, y + 25, 17);
+    if (i < SHARE_ROWS.length - 1) { ctx.fillStyle = '#e5e5ea'; ctx.fillRect(32, y + 49.5, 347, 1); }
+  });
+  ctx.restore();
+  return ly + 6 * 50 + 25;
+}
+function addDialog(p) {
+  const top = lerp(SHP, 54, easeOut(p));
+  ctx.fillStyle = `rgba(0,0,0,${.35 * p})`; ctx.fillRect(0, 0, 393, SHP);
+  rr(0, top, 393, SHP, 16); ctx.fillStyle = '#f2f2f7'; ctx.fill();
+  txt('Cancel', 18, top + 32, 16, '#0a84ff', 400);
+  txt('Add to Home Screen', 196, top + 32, 16, '#111', 700, 'center');
+  txt('Add', 372, top + 32, 16, '#0a84ff', 700, 'right');
+  rr(14, top + 70, 365, 96, 14); ctx.fillStyle = '#fff'; ctx.fill();
+  if (icon.complete) { ctx.save(); rr(28, top + 88, 60, 60, 14); ctx.clip(); ctx.drawImage(icon, 28, top + 88, 60, 60); ctx.restore(); }
+  txt('Prism Scan', 104, top + 104, 17, '#111', 500); ctx.fillStyle = '#e5e5ea'; ctx.fillRect(104, top + 120, 262, 1);
+  txt(LINK, 104, top + 140, 13, '#8e8e93', 400);
+  txt('An icon will be added to your Home Screen so', 28, top + 192, 13, '#6e6e73', 400);
+  txt('you can quickly open this app.', 28, top + 210, 13, '#6e6e73', 400);
+  rr(14, top + 236, 365, 52, 14); ctx.fillStyle = '#fff'; ctx.fill();
+  txt('Open as Web App', 30, top + 262, 16, '#111', 400);
+  rr(312, top + 247, 52, 31, 15.5); ctx.fillStyle = '#34c759'; ctx.fill();
+  ctx.beginPath(); ctx.arc(348.5, top + 262.5, 13.5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+  return top;
+}
+/* desk photo with a tilted page; corners in normalised photo coords */
+const PAPER = [[.22, .2], [.8, .13], [.86, .83], [.19, .88]];
+function quadPt(q, u, v) {
+  const top = [lerp(q[0][0], q[1][0], u), lerp(q[0][1], q[1][1], u)], bot = [lerp(q[3][0], q[2][0], u), lerp(q[3][1], q[2][1], u)];
+  return [lerp(top[0], bot[0], v), lerp(top[1], bot[1], v)];
+}
+function deskPhoto(x, y, w, h) {
+  ctx.fillStyle = grad(x, y, x + w, y + h, ['#4a3a30', '#2a201b']); ctx.fillRect(x, y, w, h);
+  const P = PAPER.map(([u, v]) => [x + u * w, y + v * h]);
+  ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.fillStyle = '#eee8dc'; ctx.fill();
+  ctx.strokeStyle = '#333'; ctx.lineCap = 'round';
+  for (let k = 0; k < 11; k++) {
+    const v = .1 + k * .075, len = k === 0 ? .55 : k % 3 === 2 ? .45 : .75;
+    const a = quadPt(P, .1, v), b = quadPt(P, .1 + len, v);
+    ctx.lineWidth = k === 0 ? 5 : 2.2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  return P;
+}
+function cameraView(t, shutterAt) {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 393, SHP);
+  deskPhoto(0, 96, 393, 610);
+  txt('PHOTO', 196, 738, 13, '#fbbf24', 700, 'center');
+  ctx.beginPath(); ctx.arc(196.5, 800, 36, 0, 7); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke();
+  const pr = Math.abs(t - shutterAt) < .12;
+  ctx.beginPath(); ctx.arc(196.5, 800, pr ? 26 : 30, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+  statusBar('#fff');
+}
+const HCOL = ['#a78bfa', '#f472b6', '#fb923c', '#2dd4bf'];
+function cropView(t) {
+  ctx.fillStyle = '#0f0a1f'; ctx.fillRect(0, 0, 393, SHP);
+  statusBar('#fff');
+  txt('‹', 24, 72, 30, '#fff', 400, 'center'); txt('Adjust corners', 196, 72, 17, '#fff', 700, 'center');
+  rr(8, 100, 377, 640, 22); ctx.fillStyle = grad(0, 100, 0, 740, ['#2e1065', '#0b0716']); ctx.fill();
+  const pw = 351, ph = pw * 610 / 393, px = 21, py = 100 + (640 - ph) / 2;
+  const P = deskPhoto(px, py, pw, ph);
+  const m = .05, start = [[px + pw * m, py + ph * m], [px + pw * (1 - m), py + ph * m], [px + pw * (1 - m), py + ph * (1 - m)], [px + pw * m, py + ph * (1 - m)]];
+  const k = easeInOut(seg(t, .5, 1.3));
+  const Q = start.map((s, i) => [lerp(s[0], P[i][0], k), lerp(s[1], P[i][1], k)]);
+  ctx.beginPath(); ctx.rect(px, py, pw, ph); Q.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.fillStyle = 'rgba(8,4,20,.55)'; ctx.fill('evenodd');
+  ctx.beginPath(); Q.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+  ctx.strokeStyle = grad(px, py, px + pw, py + ph, ['#a78bfa', '#f472b6', '#fb923c']); ctx.lineWidth = 3; ctx.stroke();
+  Q.forEach((p, i) => {
+    ctx.beginPath(); ctx.arc(p[0], p[1], 16, 0, 7); ctx.fillStyle = HCOL[i] + '55'; ctx.fill();
+    ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, 7); ctx.fillStyle = HCOL[i]; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+  });
+  const sa = seg(t, 1.4, 1.6) * (1 - seg(t, 2.6, 2.8));
+  if (sa > 0) { ctx.globalAlpha = sa; rr(116, 692, 162, 34, 17); ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fill(); txt('✅ Document found', 197, 709, 13, '#fff', 700, 'center'); ctx.globalAlpha = 1; }
+  [['✨', 'Auto', ['#a78bfa', '#ec4899']], ['⛶', 'Full', ['#38bdf8', '#14b8a6']], ['↻', 'Rotate', ['#fbbf24', '#f97316']]].forEach(([e, l, c], i) => {
+    const x = 20 + i * 60;
+    rr(x, 758, 40, 40, 13); ctx.fillStyle = grad(x, 758, x + 40, 798, c); ctx.fill();
+    txt(e, x + 20, 779, 17, '#fff', 700, 'center'); txt(l, x + 20, 812, 10, '#a99fc8', 700, 'center');
+  });
+  rr(204, 756, 172, 52, 16); ctx.fillStyle = grad(204, 756, 376, 808, BRAND); ctx.fill();
+  txt('Next →', 290, 782, 16, '#fff', 800, 'center');
+}
+function docView(sheetP) {
+  ctx.fillStyle = '#f6f3ff'; ctx.fillRect(0, 0, 393, SHP);
+  rr(0, -30, 393, 140, 22); ctx.fillStyle = grad(0, 0, 393, 110, BRAND); ctx.fill();
+  statusBar('#fff');
+  txt('‹', 24, 76, 30, '#fff', 400, 'center'); txt('Scan 15 Nov', 196, 78, 17, '#fff', 700, 'center'); txt('✎', 368, 78, 20, '#fff', 700, 'center');
+  txt('1 page · 86 KB · Today', 20, 138, 13, '#6d6488', 600);
+  ctx.save(); ctx.shadowColor = 'rgba(76,29,149,.3)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  rr(22, 164, 112, 150, 12); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
+  ctx.fillStyle = '#222'; ctx.fillRect(34, 182, 58, 5);
+  for (let k = 0; k < 10; k++) ctx.fillRect(34, 198 + k * 10, k % 3 === 2 ? 52 : 86, 2.5);
+  ctx.beginPath(); ctx.arc(24, 166, 13, 0, 7); ctx.fillStyle = grad(11, 153, 37, 179, BRAND); ctx.fill(); txt('1', 24, 166, 12, '#fff', 800, 'center');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, SHP - 100, 393, 100); ctx.fillStyle = '#e7e1f7'; ctx.fillRect(0, SHP - 100, 393, 1);
+  [['📷', 'Add', ['#8b5cf6', '#ec4899']], ['🖼️', 'Photos', ['#f472b6', '#fb923c']], ['📕', 'PDF', ['#f43f5e', '#f97316']], ['🔤', 'Text', ['#0ea5e9', '#14b8a6']], ['🗑️', 'Delete', ['#64748b', '#ef4444']]].forEach(([e, l, c], i) => {
+    const cx = 39 + i * 78.75;
+    rr(cx - 22, SHP - 88, 44, 44, 15); ctx.fillStyle = grad(cx - 22, SHP - 88, cx + 22, SHP - 44, c); ctx.fill();
+    emoji(e, cx, SHP - 65, 19); txt(l, cx, SHP - 30, 11, '#6d6488', 700, 'center');
+  });
+  if (sheetP > 0) {
+    const top = lerp(SHP, 430, easeOut(sheetP));
+    ctx.fillStyle = `rgba(15,10,31,${.55 * sheetP})`; ctx.fillRect(0, 0, 393, SHP);
+    rr(0, top, 393, SHP, 26); ctx.fillStyle = '#fff'; ctx.fill();
+    rr(174, top + 10, 44, 5, 3); ctx.fillStyle = '#e7e1f7'; ctx.fill();
+    emoji('📕', 196, top + 66, 48);
+    txt('PDF ready', 196, top + 122, 22, '#1e1537', 800, 'center');
+    txt('1 page · 89 KB', 196, top + 150, 14, '#6d6488', 500, 'center');
+    rr(20, top + 180, 353, 54, 16); ctx.fillStyle = grad(20, top + 180, 373, top + 234, BRAND); ctx.fill();
+    txt('📤 Share / Save to Files', 196, top + 207, 16, '#fff', 800, 'center');
+    rr(20, top + 246, 353, 50, 14); ctx.fillStyle = '#f6f3ff'; ctx.fill(); txt('Open PDF', 196, top + 271, 15, '#1e1537', 700, 'center');
+    return top;
+  }
+  return 0;
+}
+
+/* ---------- scenes ---------- */
+function intro(t) {
+  const s = backOut(seg(t, .1, .9));
+  ctx.save(); ctx.translate(W / 2, 740); ctx.scale(s, s); ctx.rotate((1 - seg(t, .1, .9)) * -.4);
+  ctx.shadowColor = 'rgba(40,0,70,.5)'; ctx.shadowBlur = 60; ctx.shadowOffsetY = 20;
+  rr(-190, -190, 380, 380, 86); ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (icon.complete) { ctx.save(); rr(-190, -190, 380, 380, 86); ctx.clip(); ctx.drawImage(icon, -190, -190, 380, 380); ctx.restore(); }
+  ctx.restore();
+  const a = easeOut(seg(t, .7, 1.3));
+  ctx.save(); ctx.globalAlpha = a; ctx.shadowColor = 'rgba(40,0,70,.45)'; ctx.shadowBlur = 24;
+  txt('Prism Scan', W / 2, 1060 + (1 - a) * 40, 120, '#fff', 800, 'center');
+  txt('How to install it on your iPhone', W / 2, 1170 + (1 - a) * 40, 50, 'rgba(255,255,255,.95)', 600, 'center');
+  ctx.restore();
+  ['✅ Free', '🚫 No App Store', '📶 Works offline'].forEach((l, i) => {
+    const b = easeOut(seg(t, 1.4 + i * .25, 1.9 + i * .25));
+    ctx.save(); ctx.globalAlpha = b;
+    ctx.font = `700 40px ${FONT}, ${EMOJI}`; const w = ctx.measureText(l).width + 70;
+    const y = 1330 + i * 112 + (1 - b) * 30;
+    rr(W / 2 - w / 2, y, w, 86, 43); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2; ctx.stroke();
+    txt(l, W / 2, y + 45, 40, '#fff', 700, 'center', `${FONT}, ${EMOJI}`);
+    ctx.restore();
+  });
+}
+function s1(t) {
+  if (t < 1.35) { homeScreen(t, { glow: t > .3 ? 1 : -1 }); finger(t, 1.0, dockX(1), SHP - 66); return; }
+  if (t < 4.3) {
+    const n = Math.round(LINK.length * seg(t, 1.7, 3.7));
+    safariStart(LINK.slice(0, n), t);
+    if (t > 1.35 && t < 1.7) { ctx.fillStyle = `rgba(255,255,255,${1 - seg(t, 1.35, 1.7)})`; ctx.fillRect(0, 0, 393, SHP); }
+    finger(t, 4.0, 342, SHP - 104);
+    return;
+  }
+  safariLoaded(seg(t, 4.3, 5.2), false);
+}
+function s2(t) {
+  safariLoaded(1, t > .4 && t < 1.0);
+  finger(t, .9, 354, SHP - 56);
+  const p = seg(t, 1.0, 1.35);
+  if (p > 0) { ctx.fillStyle = `rgba(0,0,0,${.15 * p})`; ctx.fillRect(0, 0, 393, SHP - 100); }
+  menuPanel(p, t > 2.0);
+  finger(t, 2.6, 230, SHP - 340);
+}
+function s3(t) {
+  safariLoaded(1, false);
+  const scroll = 110 * easeInOut(seg(t, 1.0, 2.2));
+  const pulse = t > 2.3 ? .5 + .5 * Math.sin((t - 2.3) * 9) : 0;
+  const rowY = shareSheet(seg(t, 0, .45), scroll, pulse);
+  finger(t, 3.5, 200, rowY);
+}
+function s4(t) {
+  safariLoaded(1, false);
+  const top = addDialog(seg(t, 0, .45));
+  if (t > 1.2 && t < 2.3) { ctx.save(); rr(306, top + 241, 64, 43, 21); ctx.strokeStyle = `rgba(236,72,153,${.5 + .5 * Math.sin(t * 9)})`; ctx.lineWidth = 3; ctx.stroke(); ctx.restore(); }
+  finger(t, 3.0, 372 - 16, top + 32);
+}
+function s5(t) {
+  homeScreen(t, { prism: seg(t, .5, 1.2), sparkle: seg(t, 1.0, 2.0) });
+  const [x, y] = gridPos(12);
+  if (t > 2.2 && t < 3.3) { ctx.save(); rr(x - 5, y - 5, 72, 72, 19); ctx.strokeStyle = `rgba(253,224,71,${.5 + .5 * Math.sin(t * 8)})`; ctx.lineWidth = 4; ctx.stroke(); ctx.restore(); }
+  finger(t, 3.7, x + 31, y + 31);
+}
+function s6(t) {
+  if (t < 1.6) {
+    const [gx, gy] = gridPos(12), z = easeOut(seg(t, 0, .55));
+    homeScreen(t, { prism: 1 });
+    ctx.save(); ctx.globalAlpha = clamp01(z * 1.5);
+    ctx.translate(lerp(gx + 31, 196.5, z), lerp(gy + 31, SHP / 2, z)); ctx.scale(lerp(.16, 1, z), lerp(.07, 1, z)); ctx.translate(-196.5, -SHP / 2);
+    rr(0, 0, 393, SHP, 40 * (1 - z)); ctx.clip(); appHome(SHP - 14, true);
+    ctx.restore();
+    finger(t, 1.3, 196.5, SHP - 92);
+    return;
+  }
+  if (t < 3.1) {
+    cameraView(t, 2.6);
+    finger(t, 2.6, 196.5, 800);
+    const f = seg(t, 2.65, 2.75) * (1 - seg(t, 2.8, 3.1));
+    if (f > 0) { ctx.fillStyle = `rgba(255,255,255,${f})`; ctx.fillRect(0, 0, 393, SHP); }
+    return;
+  }
+  cropView(t - 3.1);
+  finger(t, 6.3, 290, 782);
+}
+function s7(t) {
+  const top = docView(seg(t, 1.5, 1.9));
+  finger(t, 1.2, 196.5, SHP - 66);
+  if (top) finger(t, 3.7, 196.5, top + 207);
+}
+function outro(t) {
+  const a = easeOut(seg(t, 0, .6));
+  ctx.save(); ctx.globalAlpha = a; ctx.shadowColor = 'rgba(40,0,70,.45)'; ctx.shadowBlur = 24;
+  txt('You’re all set! 🎉', W / 2, 330 + (1 - a) * 40, 96, '#fff', 800, 'center', `${FONT}, ${EMOJI}`);
+  txt('3 quick tips', W / 2, 450, 48, 'rgba(255,255,255,.92)', 600, 'center');
+  ctx.restore();
+  [['🧭', 'Install from Safari', 'Chrome on iPhone can’t install apps'], ['📶', 'Be online the first time', 'The edge finder downloads once'], ['📁', 'Save PDFs to Files', 'Keeps your scans safe']].forEach(([e, h, s], i) => {
+    const b = easeOut(seg(t, .5 + i * .3, 1.1 + i * .3));
+    const y = 560 + i * 300 + (1 - b) * 50;
+    ctx.save(); ctx.globalAlpha = b;
+    ctx.shadowColor = 'rgba(40,0,70,.35)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 12;
+    rr(110, y, 860, 250, 44); ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent';
+    rr(150, y + 55, 140, 140, 36); ctx.fillStyle = grad(150, y + 55, 290, y + 195, [['#a78bfa', '#ec4899'], ['#38bdf8', '#14b8a6'], ['#fbbf24', '#f97316']][i]); ctx.fill();
+    emoji(e, 220, y + 128, 70);
+    txt(h, 330, y + 100, 52, '#1e1537', 800); txt(s, 330, y + 165, 36, '#6d6488', 500);
+    ctx.restore();
+  });
+  const c = easeOut(seg(t, 1.6, 2.2));
+  ctx.save(); ctx.globalAlpha = c;
+  ctx.font = `700 40px ${FONT}`; const w = ctx.measureText(LINK).width + 90;
+  rr(W / 2 - w / 2, 1520, w, 100, 50); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
+  txt(LINK, W / 2, 1572, 40, '#fff', 700, 'center');
+  ctx.restore();
+}
+
+const SCENES = [
+  { d: 4.2, draw: intro },
+  { d: 6.4, step: 1, title: 'Open Safari', sub: 'Type the app link, then tap go', draw: s1 },
+  { d: 3.6, step: 2, title: 'Tap  •••  then Share', sub: 'Older iPhones: tap the Share button ⬆', draw: s2 },
+  { d: 4.4, step: 3, title: 'Add to Home Screen', sub: 'Scroll down the list and tap it', draw: s3 },
+  { d: 3.8, step: 4, title: 'Tap Add', sub: 'Leave “Open as Web App” switched on', draw: s4 },
+  { d: 4.2, step: 5, title: 'It’s now an app!', sub: 'Tap the new icon on your Home Screen', draw: s5 },
+  { d: 7.0, step: 6, title: 'Scan a document', sub: 'Snap a photo · corners are found for you', draw: s6 },
+  { d: 4.6, step: 7, title: 'Save as PDF', sub: 'Share it or save it to Files', draw: s7 },
+  { d: 5.2, draw: outro },
+];
+const TOTAL = SCENES.reduce((s, x) => s + x.d, 0);
+
+function render(T) {
+  T = Math.max(0, Math.min(TOTAL - 1e-3, T));
+  background(T);
+  let acc = 0, i = 0;
+  while (i < SCENES.length - 1 && T >= acc + SCENES[i].d) acc += SCENES[i++].d;
+  const sc = SCENES[i], t = T - acc;
+  if (sc.step) { caption(t, sc); phone(() => sc.draw(t)); } else sc.draw(t);
+  // dip to dark only where the layout changes (intro -> steps -> outro)
+  const fi = 1 - seg(t, 0, .25), fo = seg(t, sc.d - .2, sc.d);
+  let f = 0;
+  if (i === 0) f = fo;
+  else if (i === 1 || i === SCENES.length - 1) f = fi;
+  if (i === SCENES.length - 2) f = Math.max(f, fo);
+  if (f > 0) { ctx.fillStyle = `rgba(20,10,40,${f * .9})`; ctx.fillRect(0, 0, W, H); }
+}
+
+/* ---------- player ---------- */
+let playing = false, startAt = 0, pos = 0;
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function ui() {
+  document.getElementById('seek').value = Math.round(pos / TOTAL * 1000);
+  document.getElementById('time').textContent = fmt(pos) + ' / ' + fmt(TOTAL);
+  document.getElementById('play').textContent = playing ? '❚❚' : '▶';
+}
+function loop(now) {
+  if (!playing) return;
+  pos = (now - startAt) / 1000;
+  if (pos >= TOTAL) { pos = TOTAL; playing = false; render(pos); ui(); if (window.__onEnd) window.__onEnd(); return; }
+  render(pos); ui(); requestAnimationFrame(loop);
+}
+function play() { if (pos >= TOTAL) pos = 0; playing = true; startAt = performance.now() - pos * 1000; requestAnimationFrame(loop); ui(); }
+function pause() { playing = false; ui(); }
+document.getElementById('play').onclick = () => playing ? pause() : play();
+cv.onclick = () => playing ? pause() : play();
+document.getElementById('restart').onclick = () => { pos = 0; play(); };
+document.getElementById('seek').oninput = e => { pos = e.target.value / 1000 * TOTAL; if (playing) startAt = performance.now() - pos * 1000; else render(pos); ui(); };
+icon.onload = () => render(pos);
+render(0.95); pos = 0; ui();
+
+/* Records the whole animation to a video blob (used to make tutorial.mp4). */
+window.recordVideo = () => new Promise((resolve, reject) => {
+  const types = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1.4d002a', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+  const type = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  if (!type) return reject(new Error('Recording not supported'));
+  const rec = new MediaRecorder(cv.captureStream(30), { mimeType: type, videoBitsPerSecond: 9000000 });
+  const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = () => resolve(new Blob(chunks, { type: type.split(';')[0] }));
+  window.__onEnd = () => setTimeout(() => { window.__onEnd = null; rec.stop(); }, 300);
+  pos = 0; render(0); rec.start(500); setTimeout(play, 150);
+});
+window.__tut = { render, TOTAL };
+</script>
+</body>
+</html>
