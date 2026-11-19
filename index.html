@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Prism Scan</title>
 <meta name="description" content="Scan, enhance and share documents. Works offline.">
-<meta name="theme-color" content="#7c3aed">
+<meta name="theme-color" content="#15302b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,53 +19,61 @@
 
 <!-- ================= HOME ================= -->
 <section id="view-home" class="view active">
-  <header class="hero">
-    <div class="hero-blobs"><i></i><i></i><i></i></div>
-    <div class="hero-row">
-      <img class="hero-logo" src="icons/icon-192.png" alt="">
-      <div>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="wordmark">
+        <span class="prism-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <h1>Prism Scan</h1>
-        <p>Scan · Enhance · Share</p>
       </div>
-      <button class="icon-btn glass" id="btn-help" aria-label="Help">?</button>
-    </div>
-    <div class="stats">
-      <div class="stat s1"><b id="stat-docs">0</b><span>Documents</span></div>
-      <div class="stat s2"><b id="stat-pages">0</b><span>Pages</span></div>
-      <div class="stat s3"><b id="stat-size">0 KB</b><span>Storage</span></div>
+      <button class="help-link" id="btn-help">Help</button>
     </div>
   </header>
 
-  <div id="install-banner" class="install-banner hidden">
-    <span>📲 Install: tap <b>Share</b> then <b>Add to Home Screen</b></span>
-    <button id="install-close" aria-label="Close">✕</button>
+  <div class="home-scroll">
+    <div class="workspace">
+      <aside class="scan-panel" aria-labelledby="scan-heading">
+        <div class="scan-intro">
+          <div class="scan-art" aria-hidden="true">
+            <i class="scan-paper"></i>
+            <i class="scan-frame"></i>
+          </div>
+          <h2 id="scan-heading">New scan</h2>
+          <p>Use your camera or import pages from Photos.</p>
+          <button class="capture-btn" id="btn-scan">Open camera <span aria-hidden="true">↗</span></button>
+          <button class="capture-btn secondary" id="btn-import">Import photos <span aria-hidden="true">+</span></button>
+        </div>
+        <div class="stats" aria-label="Library statistics">
+          <div class="stat s1"><b id="stat-docs">0</b><span>Docs</span></div>
+          <div class="stat s2"><b id="stat-pages">0</b><span>Pages</span></div>
+          <div class="stat s3"><b id="stat-size">0 KB</b><span>Storage</span></div>
+        </div>
+      </aside>
+
+      <main class="library" aria-labelledby="library-heading">
+        <div id="install-banner" class="install-banner hidden">
+          <span>Install on iPhone. Tap <b>Share</b>, then <b>Add to Home Screen</b>.</span>
+          <button id="install-close" aria-label="Close">✕</button>
+        </div>
+        <div id="android-install" class="install-banner android hidden">
+          <span>Install Prism Scan as an app</span>
+          <button id="android-install-btn" class="install-btn">Install</button>
+          <button id="android-install-close" aria-label="Close">✕</button>
+        </div>
+        <div class="library-heading">
+          <h2 id="library-heading">Documents</h2>
+          <div class="search-wrap">
+            <input id="search" type="search" placeholder="Search documents" aria-label="Search documents" autocomplete="off">
+          </div>
+        </div>
+        <div id="doc-list" class="doc-list"></div>
+        <div id="empty" class="empty hidden">
+          <div class="paper-stack" aria-hidden="true"><i></i></div>
+          <h3>No scans yet</h3>
+          <p>Your scanned documents will appear here.</p>
+        </div>
+      </main>
+    </div>
   </div>
-
-  <div id="android-install" class="install-banner android hidden">
-    <span>📲 Install Prism Scan as an app</span>
-    <button id="android-install-btn" class="install-btn">Install</button>
-    <button id="android-install-close" aria-label="Close">✕</button>
-  </div>
-
-  <div class="search-wrap">
-    <input id="search" type="search" placeholder="🔍  Search documents" autocomplete="off">
-  </div>
-
-  <main id="doc-list" class="doc-list"></main>
-
-  <div id="empty" class="empty hidden">
-    <div class="empty-art">📄✨</div>
-    <h2>No scans yet</h2>
-    <p>Tap the big camera button to scan your first document.</p>
-  </div>
-
-  <nav class="dock">
-    <button class="dock-btn" id="btn-import"><span class="dock-ic ic-pink">🖼️</span>Photos</button>
-    <button class="fab" id="btn-scan" aria-label="Scan document">
-      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>
-    </button>
-    <button class="dock-btn" id="btn-help2"><span class="dock-ic ic-teal">💡</span>Tips</button>
-  </nav>
 </section>
 
 <!-- ================= CROP ================= -->
@@ -82,7 +90,7 @@
     <div id="detect-status" class="detect-status hidden"></div>
   </div>
   <footer class="tools">
-    <button class="tool" id="crop-auto"><span class="tool-ic g1">✨</span>Auto</button>
+    <button class="tool" id="crop-auto"><span class="tool-ic g1">⌖</span>Auto</button>
     <button class="tool" id="crop-full"><span class="tool-ic g2">⛶</span>Full</button>
     <button class="tool" id="crop-rotate"><span class="tool-ic g3">↻</span>Rotate</button>
     <button class="primary" id="crop-next">Next →</button>
@@ -102,7 +110,7 @@
   </div>
   <div class="filters" id="filters"></div>
   <footer class="tools">
-    <button class="tool" id="filter-retake"><span class="tool-ic g4">📷</span>Retake</button>
+    <button class="tool" id="filter-retake"><span class="tool-ic g4">↺</span>Retake</button>
     <button class="primary" id="filter-save">✓ Save page</button>
   </footer>
 </section>
@@ -117,11 +125,11 @@
   <div class="doc-meta" id="doc-meta"></div>
   <main class="page-grid" id="page-grid"></main>
   <footer class="doc-actions">
-    <button class="act" id="doc-add"><span class="act-ic a1">📷</span>Add</button>
-    <button class="act" id="doc-import"><span class="act-ic a2">🖼️</span>Photos</button>
-    <button class="act" id="doc-pdf"><span class="act-ic a3">📕</span>PDF</button>
-    <button class="act" id="doc-ocr"><span class="act-ic a4">🔤</span>Text</button>
-    <button class="act" id="doc-delete"><span class="act-ic a5">🗑️</span>Delete</button>
+    <button class="act" id="doc-add"><span class="act-ic a1">+</span>Add</button>
+    <button class="act" id="doc-import"><span class="act-ic a2">▧</span>Photos</button>
+    <button class="act" id="doc-pdf"><span class="act-ic a3">↓</span>PDF</button>
+    <button class="act" id="doc-ocr"><span class="act-ic a4">Aa</span>Text</button>
+    <button class="act" id="doc-delete"><span class="act-ic a5">×</span>Delete</button>
   </footer>
 </section>
 
@@ -136,12 +144,12 @@
   </header>
   <div class="page-view"><img id="page-img" alt="Scanned page"></div>
   <footer class="doc-actions">
-    <button class="act" id="page-left"><span class="act-ic a1">◀</span>Move</button>
-    <button class="act" id="page-right"><span class="act-ic a2">▶</span>Move</button>
-    <button class="act" id="page-sign"><span class="act-ic a6">✍️</span>Sign</button>
-    <button class="act" id="page-ocr"><span class="act-ic a4">🔤</span>Text</button>
-    <button class="act" id="page-share"><span class="act-ic a3">📤</span>Share</button>
-    <button class="act" id="page-delete"><span class="act-ic a5">🗑️</span>Delete</button>
+    <button class="act" id="page-left"><span class="act-ic a1">←</span>Earlier</button>
+    <button class="act" id="page-right"><span class="act-ic a2">→</span>Later</button>
+    <button class="act" id="page-sign"><span class="act-ic a6">✎</span>Sign</button>
+    <button class="act" id="page-ocr"><span class="act-ic a4">Aa</span>Text</button>
+    <button class="act" id="page-share"><span class="act-ic a3">↑</span>Share</button>
+    <button class="act" id="page-delete"><span class="act-ic a5">×</span>Delete</button>
   </footer>
 </div>
 
@@ -161,14 +169,14 @@
   </div>
   <div class="sig-list" id="sig-list"></div>
   <footer class="tools">
-    <button class="tool" id="sign-new"><span class="tool-ic g1">✍️</span>New</button>
+    <button class="tool" id="sign-new"><span class="tool-ic g1">✎</span>New</button>
     <button class="primary" id="sign-apply" disabled>✓ Apply signature</button>
   </footer>
 </div>
 
 <div id="sheet-pad" class="sheet hidden">
   <div class="grab"></div>
-  <h3>✍️ Draw your signature</h3>
+  <h3>Draw your signature</h3>
   <div class="pad-wrap">
     <canvas id="pad"></canvas>
     <div class="pad-line"></div>
@@ -188,7 +196,7 @@
 
 <div id="sheet-ocr" class="sheet hidden">
   <div class="grab"></div>
-  <h3>🔤 Extract text</h3>
+  <h3>Extract text</h3>
   <div class="row">
     <label for="ocr-lang">Language</label>
     <select id="ocr-lang">
@@ -209,31 +217,30 @@
   <div class="progress hidden" id="ocr-progress"><div></div><span></span></div>
   <textarea id="ocr-text" placeholder="Recognized text will appear here…" readonly></textarea>
   <div class="row end">
-    <button class="ghost" id="ocr-copy">📋 Copy</button>
-    <button class="ghost" id="ocr-share">📤 Share</button>
+    <button class="ghost" id="ocr-copy">Copy</button>
+    <button class="ghost" id="ocr-share">Share</button>
     <button class="ghost" data-close>Done</button>
   </div>
 </div>
 
 <div id="sheet-export" class="sheet hidden">
   <div class="grab"></div>
-  <div class="export-art">📕</div>
   <h3 id="export-title">PDF ready</h3>
   <p id="export-info" class="muted"></p>
   <div class="col">
     <button class="primary" id="export-share">📤 Share / Save to Files</button>
-    <button class="ghost" id="export-open">👁️ Open PDF</button>
+    <button class="ghost" id="export-open">Open PDF</button>
     <button class="ghost" data-close>Close</button>
   </div>
 </div>
 
 <div id="sheet-help" class="sheet hidden">
   <div class="grab"></div>
-  <h3>💡 Tips</h3>
+  <h3>Tips</h3>
   <ul class="tips">
     <li><b>Install on iPhone:</b> in Safari tap <b>•••</b> or <b>Share</b>, then <b>Add to Home Screen</b>.</li>
     <li><b>Install on Android:</b> in Chrome tap <b>⋮</b>, then <b>Install app</b> (or <b>Add to Home screen</b>).</li>
-    <li><b>Sign:</b> open a page and tap <b>✍️ Sign</b>. Your saved signatures stay on this phone.</li>
+    <li><b>Sign:</b> open a page and tap <b>Sign</b>. Your saved signatures stay on this phone.</li>
     <li><b>Best scans:</b> put the paper on a dark, plain surface with good light.</li>
     <li><b>Corners:</b> drag the colored dots. A zoom bubble helps you place them exactly.</li>
     <li><b>Magic</b> filter whitens paper and sharpens text. <b>B&amp;W</b> is best for printing.</li>
@@ -241,8 +248,8 @@
     <li><b>Private:</b> scans stay on this phone. Export important PDFs to Files as a backup.</li>
   </ul>
   <div class="col">
-    <button class="primary hidden" id="tips-install">📲 Install app</button>
-    <a class="ghost video-link" href="tutorial.html">▶️ Watch the install video</a>
+    <button class="primary hidden" id="tips-install">Install app</button>
+    <a class="ghost video-link" href="tutorial.html">Watch the install video</a>
     <button class="primary" data-close>Got it</button>
   </div>
 </div>
