@@ -385,11 +385,9 @@
     list.textContent = '';
     const shown = docs.filter(d => !q || d.name.toLowerCase().includes(q));
     $('#empty').classList.toggle('hidden', docs.length > 0);
-    let i = 0;
     for (const d of shown) {
       const card = document.createElement('button');
       card.className = 'doc-card';
-      card.style.animationDelay = Math.min(i * 40, 400) + 'ms';
       const th = document.createElement('div'); th.className = 'doc-thumb c' + (hashCode(d.id) % 6);
       const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy';
       th.appendChild(img);
@@ -401,10 +399,9 @@
       card.onclick = () => openDoc(d.id);
       list.appendChild(card);
       if (d.pages[0]) thumbUrl(d.pages[0]).then(u => { if (u) img.src = u; });
-      i++;
     }
     if (docs.length && !shown.length) {
-      const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'No documents match your search.';
+      const p = document.createElement('p'); p.className = 'search-empty muted'; p.textContent = 'No documents match your search.';
       list.appendChild(p);
     }
   }
@@ -1076,7 +1073,7 @@
   /* ---------------- home buttons, install hint, offline ---------------- */
   $('#btn-scan').onclick = () => startCamera(null);
   $('#btn-import').onclick = () => startPhotos(null);
-  $('#btn-help').onclick = $('#btn-help2').onclick = () => openSheet('sheet-help');
+  $('#btn-help').onclick = () => openSheet('sheet-help');
 
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
