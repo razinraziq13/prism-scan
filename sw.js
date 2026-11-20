@@ -1,5 +1,5 @@
 // Prism Scan service worker: makes the app open and work offline.
-const VERSION = 'prism-scan-v4';
+const VERSION = 'prism-scan-v5';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',

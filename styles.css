@@ -412,3 +412,112 @@ textarea {
   .view.active, .sheet, .sheet-backdrop { animation: none; }
   .toast { transition: none; }
 }
+
+/* Liquid Glass surfaces. Document previews stay opaque for accurate editing. */
+:root {
+  --glass-wallpaper: radial-gradient(ellipse at 8% 5%, #d4c1ff 0%, transparent 54%),
+    radial-gradient(ellipse at 96% 28%, #ffd5ed 0%, transparent 48%),
+    radial-gradient(ellipse at 92% 94%, #bceef5 0%, transparent 57%), #f2effa;
+  --glass-fill: rgba(255, 255, 255, .56);
+  --glass-rim: rgba(255, 255, 255, .8);
+  --glass-glint: rgba(255, 255, 255, .4);
+  --glass-shadow: rgba(53, 40, 96, .24);
+  --glass-accent: linear-gradient(150deg, #6746cc, #5330b0 56%, #802f83);
+  --glass-focus: #5031a4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-wallpaper: radial-gradient(ellipse at 8% 5%, #38235b 0%, transparent 54%),
+      radial-gradient(ellipse at 96% 28%, #50233f 0%, transparent 48%),
+      radial-gradient(ellipse at 92% 94%, #133748 0%, transparent 57%), #110e20;
+    --glass-fill: rgba(31, 24, 52, .76);
+    --glass-rim: rgba(228, 218, 255, .25);
+    --glass-glint: rgba(244, 232, 255, .13);
+    --glass-shadow: rgba(0, 0, 0, .52);
+    --glass-focus: #e1cdff;
+  }
+}
+
+body, .view, .sheet.full { background: var(--glass-wallpaper); }
+.masthead, .scan-intro, .empty, .bar, .bar.color, .doc-card, #search, .tools, .doc-actions,
+.sheet:not(.full), .ghost, .install-banner, .install-banner.android {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-rim);
+  box-shadow: inset 0 1px 1px var(--glass-glint), 0 10px 28px -15px var(--glass-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(155%);
+  backdrop-filter: blur(18px) saturate(155%);
+}
+
+.masthead {
+  margin: calc(var(--safe-top) + 10px) 14px 0;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--text);
+}
+.scan-intro, .empty {
+  color: var(--text);
+  border-radius: 28px;
+}
+.scan-intro h2, .library-heading h2, .empty h3 { font-family: inherit; }
+.scan-intro p, .stat span { color: var(--muted); }
+.scan-art { color: var(--glass-focus); }
+.scan-frame, .scan-art::after { border-color: currentColor; }
+.help-link, .capture-btn.secondary, .stat, .icon-btn {
+  color: var(--text);
+  background: var(--glass-glint);
+  border: 1px solid var(--glass-rim);
+  border-radius: 18px;
+}
+.help-link, #search, .ghost, .capture-btn { border-radius: 999px; }
+#search::placeholder { color: var(--muted); }
+.doc-card { border-radius: 22px; }
+.doc-thumb { border-radius: 16px; }
+.stage, .sign-stage { border-radius: 24px; }
+.doc-count, .page-num { border-radius: 999px; }
+.tool-ic, .act-ic {
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.65), inset 0 -4px 8px rgba(55,35,100,.15);
+}
+.capture-btn:not(.secondary), .primary, .pill, .install-banner .install-btn {
+  background: var(--glass-accent);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.38);
+  box-shadow: inset 0 1px 3px rgba(255,255,255,.55), 0 8px 20px -7px rgba(62,30,126,.6);
+}
+.primary { border-radius: 999px; }
+.bar, .bar.color {
+  color: var(--text);
+  margin: calc(var(--safe-top) + 6px) 10px 8px;
+  padding: 5px 8px;
+  border-radius: 999px;
+}
+.bar .icon-btn.light { color: var(--text); }
+.tools, .doc-actions {
+  margin: 8px 10px calc(var(--safe-bot) + 8px);
+  padding: 8px;
+  border-radius: 24px;
+}
+.install-banner, .install-banner.android {
+  color: var(--text);
+  border-radius: 20px;
+}
+.install-banner button, .install-banner.android button { color: var(--text); }
+.install-banner .install-btn { color: #fff; }
+.sheet:not(.full) { border-radius: 30px 30px 0 0; }
+.sheet-backdrop { background: rgba(17, 12, 33, .46); }
+.masthead :focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --glass-fill: var(--card); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass-fill: var(--card); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view.active, .doc-card, .page-card, .sheet, .sheet-backdrop { animation: none; }
+  .toast { transition: none; }
+}
